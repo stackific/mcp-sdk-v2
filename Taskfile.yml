@@ -1,0 +1,202 @@
+# Root Taskfile — the single entrypoint for the whole multi-language monorepo.
+# Drives the TypeScript, Python, and C# stacks plus the shared frontend.
+#
+# Ports are declared here ONCE (the single source of truth) and passed to each
+# process as env vars; `task stop` frees exactly this set.
+#
+# Quick start:
+#   task setup      # install dependencies for every stack
+#   task dev        # run the frontend + all stacks (switch languages live)
+#   task stop       # free all dev ports
+#
+# Per-language dev:  task dev:ts | task dev:py | task dev:csharp
+#
+# https://taskfile.dev
+version: '3'
+
+vars:
+  FRONTEND_PORT: 8000
+  TS_MCP_SERVER_PORT: 8001
+  TS_MCP_CLIENT_PORT: 8002
+  TS_AUTH_PORT: 8003
+  PY_MCP_SERVER_PORT: 8101
+  PY_MCP_CLIENT_PORT: 8102
+  CSHARP_MCP_SERVER_PORT: 8201
+  CSHARP_MCP_CLIENT_PORT: 8202
+  # The full set of dev ports, derived from the above — consumed by `task stop`.
+  ALL_PORTS: >-
+    {{.FRONTEND_PORT}} {{.TS_MCP_SERVER_PORT}} {{.TS_MCP_CLIENT_PORT}} {{.TS_AUTH_PORT}}
+    {{.PY_MCP_SERVER_PORT}} {{.PY_MCP_CLIENT_PORT}}
+    {{.CSHARP_MCP_SERVER_PORT}} {{.CSHARP_MCP_CLIENT_PORT}}
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  # ── Setup / install ──────────────────────────────────────────────────────────
+  setup:
+    desc: Install dependencies for every stack (Node/pnpm, Python/uv, .NET)
+    cmds:
+      - task: setup:ts
+      - task: setup:py
+      - task: setup:csharp
+
+  setup:ts:
+    desc: Install the TypeScript stack (pnpm; postinstall links ts-sdk + ts-mcp-server)
+    cmds:
+      - pnpm install
+
+  setup:py:
+    desc: Install the Python stack (uv sync for client + server)
+    cmds:
+      - task: py:server:install
+      - task: py:client:install
+
+  setup:csharp:
+    desc: Restore the C# stack (dotnet restore for client + server)
+    cmds:
+      - dotnet restore csharp-mcp-server/csharp-mcp-server.csproj
+      - dotnet restore csharp-mcp-client/csharp-mcp-client.csproj
+
+  py:server:install:
+    internal: true
+    dir: py-mcp-server
+    cmds: [uv sync]
+
+  py:client:install:
+    internal: true
+    dir: py-mcp-client
+    cmds: [uv sync]
+
+  # ── Dev (run servers) ────────────────────────────────────────────────────────
+  dev:
+    desc: Run the frontend + all three stacks (switch languages live in the UI)
+    deps:
+      - frontend
+      - ts:server
+      - ts:client
+      - py:server
+      - py:client
+      - csharp:server
+      - csharp:client
+
+  dev:ts:
+    desc: Run the frontend + the TypeScript stack
+    deps: [frontend, ts:server, ts:client]
+
+  dev:py:
+    desc: Run the frontend + the Python stack
+    deps: [frontend, py:server, py:client]
+
+  dev:csharp:
+    desc: Run the frontend + the C# stack
+    deps: [frontend, csharp:server, csharp:client]
+
+  frontend:
+    desc: Shared companion frontend (Vite, :8000)
+    cmds:
+      - pnpm --filter @stackific/frontend dev
+
+  ts:server:
+    desc: TypeScript MCP server + OAuth AS (:8001 / :8003)
+    env:
+      MCP_PORT: '{{.TS_MCP_SERVER_PORT}}'
+      AUTH_PORT: '{{.TS_AUTH_PORT}}'
+    cmds:
+      - pnpm --dir ts-mcp-server dev
+
+  ts:client:
+    desc: TypeScript MCP client host (:8002)
+    env:
+      BACKEND_PORT: '{{.TS_MCP_CLIENT_PORT}}'
+      MCP_SERVER_URL: 'http://localhost:{{.TS_MCP_SERVER_PORT}}/mcp'
+      AUTH_SERVER_URL: 'http://localhost:{{.TS_AUTH_PORT}}'
+      FRONTEND_URL: 'http://localhost:{{.FRONTEND_PORT}}'
+    cmds:
+      - pnpm --filter @stackific/ts-mcp-client dev
+
+  py:server:
+    desc: Python MCP server placeholder (FastAPI, :8101)
+    dir: py-mcp-server
+    env:
+      PY_MCP_SERVER_PORT: '{{.PY_MCP_SERVER_PORT}}'
+    cmds:
+      - uv run python main.py
+
+  py:client:
+    desc: Python MCP client host placeholder (FastAPI, :8102)
+    dir: py-mcp-client
+    env:
+      PY_MCP_CLIENT_PORT: '{{.PY_MCP_CLIENT_PORT}}'
+      PY_MCP_SERVER_URL: 'http://localhost:{{.PY_MCP_SERVER_PORT}}'
+    cmds:
+      - uv run python main.py
+
+  csharp:server:
+    desc: C# MCP server placeholder (.NET 10 Minimal API, :8201)
+    dir: csharp-mcp-server
+    env:
+      CSHARP_MCP_SERVER_PORT: '{{.CSHARP_MCP_SERVER_PORT}}'
+    cmds:
+      - dotnet watch run
+
+  csharp:client:
+    desc: C# MCP client host placeholder (.NET 10 Minimal API, :8202)
+    dir: csharp-mcp-client
+    env:
+      CSHARP_MCP_CLIENT_PORT: '{{.CSHARP_MCP_CLIENT_PORT}}'
+      CSHARP_MCP_SERVER_URL: 'http://localhost:{{.CSHARP_MCP_SERVER_PORT}}'
+    cmds:
+      - dotnet watch run
+
+  # ── Stop ─────────────────────────────────────────────────────────────────────
+  stop:
+    desc: Stop every process listening on the monorepo's dev ports
+    env:
+      STOP_PORTS: '{{.ALL_PORTS}}'
+    cmds:
+      - node scripts/stop-ports.mjs
+
+  # ── Build / typecheck ────────────────────────────────────────────────────────
+  build:
+    desc: Build/compile every stack
+    cmds:
+      - task: build:ts
+      - task: build:csharp
+      - task: build:py
+
+  build:ts:
+    desc: Build the TypeScript stack (SDK emit + workspace builds)
+    cmds:
+      - pnpm --dir ts-sdk build
+      - pnpm -r build
+      - pnpm --dir ts-mcp-server typecheck
+
+  build:csharp:
+    desc: Build the C# stack
+    cmds:
+      - dotnet build csharp-mcp-server/csharp-mcp-server.csproj --nologo
+      - dotnet build csharp-mcp-client/csharp-mcp-client.csproj --nologo
+
+  build:py:
+    desc: Byte-compile the Python stack (smoke check)
+    cmds:
+      - uv run --directory py-mcp-server python -m compileall main.py
+      - uv run --directory py-mcp-client python -m compileall main.py
+
+  typecheck:
+    desc: Typecheck/compile every stack without emitting artifacts
+    cmds:
+      - pnpm -r typecheck
+      - pnpm --dir ts-sdk typecheck
+      - pnpm --dir ts-mcp-server typecheck
+      - dotnet build csharp-mcp-server/csharp-mcp-server.csproj --nologo
+      - dotnet build csharp-mcp-client/csharp-mcp-client.csproj --nologo
+
+  format:
+    desc: Format the repo (Prettier for JS/TS/JSON/Markdown)
+    cmds:
+      - pnpm format

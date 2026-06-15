@@ -1,0 +1,9 @@
+# The TypeScript stack's pnpm workspace: only the client host (ts-mcp-client) and
+# the frontend are workspace packages. The SDK (ts-sdk) and the reference server
+# (ts-mcp-server) are intentionally NOT workspace members — they install standalone
+# so the companion stays server-agnostic and the reference server is deletable.
+# Non-TypeScript stacks (python-*, csharp-*) live outside pnpm and are orchestrated
+# by the root Taskfile.
+packages:
+  - ts-mcp-client
+  - frontend

@@ -1,0 +1,30 @@
+{
+  "name": "@stackific/ts-mcp-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript MCP client host: hosts the MCP client runtime server-side (Node-only), drives any compliant MCP server over Streamable HTTP, and exposes a REST + live wire-debug surface to the frontend. DeepSeek (Anthropic-compatible) sampling provider + URL-elicitation page included.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.0",
+    "@cfworker/json-schema": "^4.1.1",
+    "@hono/node-server": "^1.14.0",
+    "@stackific/mcp-sdk-ts": "file:../ts-sdk",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "hono": "^4.12.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.0"
+  }
+}

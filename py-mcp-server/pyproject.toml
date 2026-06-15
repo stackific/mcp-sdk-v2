@@ -1,0 +1,14 @@
+[project]
+name = "py-mcp-server"
+version = "0.1.0"
+description = "Placeholder Python MCP server (FastAPI). Demonstrates the per-language server configuration; no real MCP implementation."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+]
+
+[tool.uv]
+# This is an application, not a library — uv only manages the venv + deps and never
+# tries to build/install the project itself.
+package = false

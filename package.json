@@ -1,0 +1,27 @@
+{
+  "name": "mcp-v2-companion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP-server-agnostic V2 RC companion: a TanStack/shadcn client + Hono backend (MCP client host) that drive any compliant MCP server over Streamable HTTP, with live under-the-hood wire debugging. See MCP_SERVER_REQUIREMENTS.md.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install-extras.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:workspace": "pnpm -r --parallel --stream dev",
+    "dev:ts-client": "pnpm --filter @stackific/ts-mcp-client dev",
+    "dev:frontend": "pnpm --filter @stackific/frontend dev",
+    "dev:ts-server": "pnpm --dir ts-mcp-server dev",
+    "stop": "node scripts/stop-ports.mjs",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  }
+}

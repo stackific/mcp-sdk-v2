@@ -1,0 +1,91 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #060914;
+  color: #e6e9f5;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Light theme. The UI is built dark-first on a symmetric `slate` scale (dark
+ * surfaces = slate-950/900, light text = slate-100/200). Rather than add `dark:`
+ * variants to ~39 files, light mode (the absence of `.dark`) remaps the slate
+ * scale to its mirror so every literal `slate-*` utility flips, plus darkens the
+ * "light text" accent shades (200/300/400) and flips the dark error surface so
+ * faint-tint badges/errors stay legible on a light background. Solid accent
+ * backgrounds, /15 tints, and rings are unchanged.
+ */
+html:not(.dark) {
+  /* slate scale, inverted (950 ↔ 50, 900 ↔ 100, …, 500 fixed) */
+  --color-slate-50: #020617;
+  --color-slate-100: #0f172a;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #475569;
+  --color-slate-500: #64748b;
+  --color-slate-600: #94a3b8;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #f1f5f9;
+  --color-slate-950: #f8fafc;
+
+  /* accent "light text" shades → darken for contrast on a light surface */
+  --color-blue-200: #1e40af;
+  --color-blue-300: #1d4ed8;
+  --color-blue-400: #2563eb;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-amber-300: #b45309;
+  --color-amber-400: #d97706;
+  --color-red-200: #991b1b;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+
+  /* dark error-box surface → light red tint + border */
+  --color-red-900: #fecaca;
+  --color-red-950: #fee2e2;
+}
+
+html:not(.dark) body {
+  background: #f6f8fc;
+  color: #0f172a;
+}
+
+html:not(.dark) * {
+  scrollbar-color: #c2ccde transparent;
+}
+html:not(.dark) *::-webkit-scrollbar-thumb {
+  background: #c2ccde;
+}
+
+/* Thin scrollbars for the wire-debug panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3354 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a3354;
+  border-radius: 8px;
+}

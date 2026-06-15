@@ -1,0 +1,22 @@
+{
+  "name": "@stackific/ts-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference TypeScript MCP server (stateless Streamable HTTP, protocol 2026-07-28) built on @stackific/mcp-sdk-ts's server runtime — feeds the TS MCP client host. Optional & deletable.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@stackific/mcp-sdk-ts": "file:../ts-sdk",
+    "hono": "^4.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "@stackific/mcp-sdk-ts",
+  "version": "0.1.0",
+  "description": "Model Context Protocol SDK for Node.js — specification-compliant implementation",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "workerd": "./dist/client/index.js",
+      "import": "./dist/client/index.js",
+      "types": "./dist/client/index.d.ts"
+    },
+    "./server": {
+      "workerd": "./dist/server/index.js",
+      "import": "./dist/server/index.js",
+      "types": "./dist/server/index.d.ts"
+    },
+    "./server/node": {
+      "import": "./dist/server/node.js",
+      "types": "./dist/server/node.d.ts"
+    },
+    "./testing": {
+      "workerd": "./dist/testing/index.js",
+      "import": "./dist/testing/index.js",
+      "types": "./dist/testing/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "docs": "typedoc"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.12.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
