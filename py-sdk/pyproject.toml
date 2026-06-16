@@ -16,5 +16,8 @@ packages = ["src/mcp"]
 dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+# importlib mode lets test modules share a basename across directories
+# (e.g. tests/jsonrpc/test_framing.py and tests/transport/test_framing.py).
+addopts = "-q --import-mode=importlib"
 testpaths = ["tests"]
+pythonpath = ["src"]
