@@ -21,12 +21,13 @@ vars:
   TS_AUTH_PORT: 8003
   PY_MCP_SERVER_PORT: 8101
   PY_MCP_CLIENT_PORT: 8102
+  PY_AUTH_PORT: 8103
   CSHARP_MCP_SERVER_PORT: 8201
   CSHARP_MCP_CLIENT_PORT: 8202
   # The full set of dev ports, derived from the above — consumed by `task stop`.
   ALL_PORTS: >-
     {{.FRONTEND_PORT}} {{.TS_MCP_SERVER_PORT}} {{.TS_MCP_CLIENT_PORT}} {{.TS_AUTH_PORT}}
-    {{.PY_MCP_SERVER_PORT}} {{.PY_MCP_CLIENT_PORT}}
+    {{.PY_MCP_SERVER_PORT}} {{.PY_MCP_CLIENT_PORT}} {{.PY_AUTH_PORT}}
     {{.CSHARP_MCP_SERVER_PORT}} {{.CSHARP_MCP_CLIENT_PORT}}
 
 tasks:
@@ -125,10 +126,12 @@ tasks:
       - pnpm --filter @stackific/ts-mcp-client dev
 
   py:server:
-    desc: Python MCP server on py-sdk (FastAPI, :8101)
+    desc: Python MCP server + OAuth AS on py-sdk (FastAPI, :8101 / :8103)
     dir: py-mcp-server
     env:
       PY_MCP_SERVER_PORT: '{{.PY_MCP_SERVER_PORT}}'
+      PY_AUTH_PORT: '{{.PY_AUTH_PORT}}'
+      FRONTEND_URL: 'http://localhost:{{.FRONTEND_PORT}}'
     cmds:
       - uv run python main.py
 
@@ -138,6 +141,8 @@ tasks:
     env:
       PY_MCP_CLIENT_PORT: '{{.PY_MCP_CLIENT_PORT}}'
       PY_MCP_SERVER_URL: 'http://localhost:{{.PY_MCP_SERVER_PORT}}'
+      PY_AUTH_SERVER_URL: 'http://localhost:{{.PY_AUTH_PORT}}'
+      FRONTEND_URL: 'http://localhost:{{.FRONTEND_PORT}}'
     cmds:
       - uv run python main.py
 
@@ -210,8 +215,9 @@ tasks:
   build:py:
     desc: Byte-compile the Python stack (smoke check)
     cmds:
-      - uv run --directory py-mcp-server python -m compileall main.py
-      - uv run --directory py-mcp-client python -m compileall main.py
+      - uv run --directory py-sdk python -m compileall -q src
+      - uv run --directory py-mcp-server python -m compileall -q .
+      - uv run --directory py-mcp-client python -m compileall -q .
 
   typecheck:
     desc: Typecheck/compile every stack without emitting artifacts
