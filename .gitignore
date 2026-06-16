@@ -20,4 +20,5 @@ __pycache__/
 # .NET
 bin/
 obj/
+TestResults/
 .parity-analysis/
