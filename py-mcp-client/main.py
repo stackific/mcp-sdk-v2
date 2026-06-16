@@ -1,57 +1,46 @@
-"""Python MCP client host (FastAPI) built on the py-sdk (``stackific-mcp``).
+"""Python MCP client host (FastAPI) built on the SDK (``stackific-mcp``).
 
-Hosts an MCP :class:`~mcp.client.Client` connected to ``py-mcp-server`` over Streamable
-HTTP and exposes the companion frontend's REST + Server-Sent-Events surface. This is the
-real Python counterpart to ``ts-mcp-client``: capability calls drive genuine MCP
-requests and return the server's results.
-
-Deferred (own phases, like the SDK seams they rely on): live per-frame wire tapping on
-``/debug/stream`` (a synthesized status + note is emitted instead), server→client
-features (sampling/elicitation/roots), subscriptions, and tasks — the catch-all returns
-a friendly not-implemented for those.
+The real Python counterpart to ``ts-mcp-client``: it hosts an MCP client connected to
+``py-mcp-server`` over Streamable HTTP, taps every JSON-RPC frame to ``/debug/stream``,
+and exposes the companion frontend's full REST surface so every capability page drives a
+real MCP request and shows what crosses the wire.
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import os
-import time
 from collections.abc import Callable
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from mcp.client import Client, RequestError, StreamableHttpClientTransport
+from mcp.client import RequestError
 
-# Ports + the server URL are owned by the root Taskfile; these defaults match it.
-PORT = int(os.environ.get("PY_MCP_CLIENT_PORT", "8102"))
-MCP_SERVER_BASE = os.environ.get("PY_MCP_SERVER_URL", "http://localhost:8101").rstrip("/")
-MCP_ENDPOINT = f"{MCP_SERVER_BASE}/mcp"
-
-client = Client(
-  StreamableHttpClientTransport(MCP_ENDPOINT),
-  {"name": "py-mcp-client", "title": "Python MCP Client", "version": "0.1.0"},
-  capabilities={},
+from auth_flow import run_auth_flow
+from config import DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, HAS_KEY, MCP_SERVER_URL, PORT
+from debug_bus import bus
+from elicitation import list_pending, resolve_pending
+from mcp_client import (
+  api,
+  cancel,
+  ensure_connected,
+  get_roots,
+  get_status,
+  reconnect,
+  set_roots,
 )
+from transport import transport_probe
 
 app = FastAPI(title="py-mcp-client")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-
-def ensure_connected() -> None:
-  """Lazily run discovery so status reflects the real connection. Failures are swallowed
-  here and surfaced via ``status.connected == False``.
-  """
-  if not client.connected:
-    try:
-      client.discover()
-    except Exception:  # noqa: BLE001 — unreachable server → connected stays False
-      pass
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
 
 
 def run(fn: Callable[[], object]) -> dict:
-  """Shape a capability call into the frontend's ApiResult ({ok, result} / {ok, error})."""
+  """Shape an MCP call into the frontend's ApiResult ({ok, result} / {ok, error})."""
   try:
     return {"ok": True, "result": fn()}
   except RequestError as exc:
@@ -60,144 +49,187 @@ def run(fn: Callable[[], object]) -> dict:
     return {"ok": False, "error": {"message": str(exc)}}
 
 
-def _status() -> dict:
-  return {**client.status(), "serverUrl": MCP_ENDPOINT}
-
-
 @app.get("/health")
-def health() -> dict[str, str]:
-  return {"status": "ok", "language": "python", "framework": "fastapi", "sdk": "stackific-mcp"}
+def health() -> dict:
+  return {"status": "ok", "sampling": "deepseek" if HAS_KEY else "mock"}
 
 
 @app.get("/info")
 def info() -> dict:
-  ensure_connected()
-  return {"name": "py-mcp-client", "language": "python", "serverUrl": MCP_ENDPOINT, "status": _status()}
+  return {
+    "name": "py-mcp-companion-backend",
+    "sampling": {"provider": "deepseek (anthropic-compatible)" if HAS_KEY else "mock", "model": DEEPSEEK_MODEL if HAS_KEY else "mock-deepseek", "baseUrl": DEEPSEEK_BASE_URL, "keyPresent": HAS_KEY},
+    "status": get_status(),
+  }
+
+
+# ── Live wire-debug stream — relays every JSON-RPC frame to the frontend ──
+@app.get("/debug/stream")
+async def debug_stream() -> StreamingResponse:
+  loop = asyncio.get_running_loop()
+  queue: asyncio.Queue = asyncio.Queue()
+
+  def on_frame(frame: dict) -> None:
+    loop.call_soon_threadsafe(queue.put_nowait, frame)
+
+  def sse(event: str, data: object) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+  async def events():
+    bus.on(on_frame)
+    try:
+      # Connect lazily off the event loop so the first status reflects the real connection.
+      await asyncio.to_thread(ensure_connected)
+      yield sse("status", get_status())
+      while True:
+        try:
+          frame = await asyncio.wait_for(queue.get(), timeout=15.0)
+          yield sse("frame", frame)
+        except asyncio.TimeoutError:
+          yield sse("ping", {})
+    finally:
+      bus.off(on_frame)
+
+  return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+
+
+# ── Connection + discovery ──
+@app.post("/api/connect")
+def api_connect() -> dict:
+  return run(lambda: (reconnect(), get_status())[1])
 
 
 @app.get("/api/status")
 def api_status() -> dict:
   ensure_connected()
-  return _status()
-
-
-@app.post("/api/connect")
-def api_connect() -> dict:
-  # Always (re)discover — drives a visible server/discover round-trip.
-  return run(lambda: (client.discover(), _status())[1])
+  return get_status()
 
 
 @app.get("/api/discover")
 def api_discover() -> dict:
-  return run(client.discover)
+  return run(api.discover)
 
 
+# ── Tools ──
 @app.get("/api/tools")
 def api_tools() -> dict:
-  ensure_connected()
-  return run(client.list_tools)
+  return run(api.list_tools)
 
 
+# NOTE: every route that drives a (blocking, synchronous) SDK call is a plain ``def``
+# so FastAPI runs it in a worker thread — never on the event loop. This is essential:
+# the elicitation bridge and a cancellable call BLOCK their handler, and blocking the
+# loop would freeze the whole host (e.g. /api/cancel could never run).
 @app.post("/api/tools/call")
-async def api_tools_call(request: Request) -> dict:
-  body = await request.json()
-  ensure_connected()
-  return run(lambda: client.call_tool(body.get("name"), body.get("arguments") or {}))
+def api_tools_call(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.call_tool(body.get("name"), body.get("arguments") or {}))
 
 
+@app.post("/api/tools/call-cancellable")
+def api_tools_call_cancellable(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.call_tool_cancellable(body.get("name"), body.get("arguments") or {}, body.get("cancelId")))
+
+
+@app.post("/api/cancel")
+def api_cancel(body: dict = Body(default={})) -> dict:
+  return {"ok": cancel(body.get("cancelId"))}
+
+
+@app.post("/api/tools/call-traced")
+def api_tools_call_traced(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.call_tool_with_meta(body.get("name"), body.get("arguments") or {}, body.get("_meta") or {}))
+
+
+# ── Generic JSON-RPC passthrough ──
+@app.post("/api/raw")
+def api_raw(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.raw(body.get("method"), body.get("params") or {}))
+
+
+# ── Subscriptions ──
+@app.post("/api/subscribe")
+def api_subscribe(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.subscribe(body.get("notifications") or {}))
+
+
+# ── Tasks extension ──
+@app.post("/api/tasks/create")
+def api_tasks_create(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.create_task(body.get("name"), body.get("arguments") or {}, body.get("ttl")))
+
+
+@app.post("/api/tasks/get")
+def api_tasks_get(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.get_task(body.get("taskId")))
+
+
+# ── Authorization ──
+@app.post("/api/authorize/run")
+def api_authorize_run() -> dict:
+  return run(run_auth_flow)
+
+
+# ── Transport probe ──
+@app.get("/api/transport/probe")
+def api_transport_probe() -> dict:
+  return run(transport_probe)
+
+
+# ── Resources ──
 @app.get("/api/resources")
 def api_resources() -> dict:
-  ensure_connected()
-  return run(client.list_resources)
+  return run(api.list_resources)
 
 
 @app.get("/api/resource-templates")
 def api_resource_templates() -> dict:
-  ensure_connected()
-  return run(client.list_resource_templates)
+  return run(api.list_resource_templates)
 
 
 @app.post("/api/resources/read")
-async def api_resources_read(request: Request) -> dict:
-  body = await request.json()
-  ensure_connected()
-  return run(lambda: client.read_resource(body.get("uri")))
+def api_resources_read(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.read_resource(body.get("uri")))
 
 
+# ── Prompts ──
 @app.get("/api/prompts")
 def api_prompts() -> dict:
-  ensure_connected()
-  return run(client.list_prompts)
+  return run(api.list_prompts)
 
 
 @app.post("/api/prompts/get")
-async def api_prompts_get(request: Request) -> dict:
-  body = await request.json()
-  ensure_connected()
-  return run(lambda: client.get_prompt(body.get("name"), body.get("arguments") or {}))
+def api_prompts_get(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.get_prompt(body.get("name"), body.get("arguments") or {}))
 
 
+# ── Completion ──
 @app.post("/api/complete")
-async def api_complete(request: Request) -> dict:
-  body = await request.json()
-  ensure_connected()
-  return run(lambda: client.complete(body.get("ref"), body.get("argument"), body.get("context")))
+def api_complete(body: dict = Body(default={})) -> dict:
+  return run(lambda: api.complete(body.get("ref"), body.get("argument"), body.get("context")))
 
 
-@app.post("/api/raw")
-async def api_raw(request: Request) -> dict:
-  body = await request.json()
-  ensure_connected()
-  return run(lambda: client.raw(body.get("method"), body.get("params") or {}))
-
-
+# ── Roots (the server calls roots/list on the client; the SPA configures them here) ──
 @app.get("/api/roots")
 def api_roots() -> dict:
-  return {"roots": []}  # the client roots feature is deferred
+  return {"roots": get_roots()}
 
 
-@app.get("/debug/stream")
-async def debug_stream() -> StreamingResponse:
-  """SSE relay matching the TS backend. Emits the live connection status + a note, then
-  keep-alive pings. Per-frame wire tapping is a deferred enhancement.
-  """
-
-  def sse(event: str, data: dict) -> str:
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
-
-  async def events():
-    await asyncio.to_thread(ensure_connected)
-    reached = "connected to " + MCP_ENDPOINT if client.connected else "could not reach " + MCP_ENDPOINT
-    yield sse("status", _status())
-    yield sse(
-      "frame",
-      {
-        "seq": 1,
-        "ts": int(time.time() * 1000),
-        "dir": "local",
-        "kind": "note",
-        "summary": f"Python stack live via py-sdk — client {reached}.",
-      },
-    )
-    while True:
-      await asyncio.sleep(15)
-      yield sse("ping", {})
-
-  return StreamingResponse(
-    events(),
-    media_type="text/event-stream",
-    headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-  )
+@app.post("/api/roots")
+def api_set_roots(body: dict = Body(default={})) -> dict:
+  set_roots(body.get("roots") or [])
+  return {"roots": get_roots()}
 
 
-# Catch-all for capabilities not implemented in this host yet (tasks, subscriptions,
-# authorization, transport probe, …). Registered last so the specific routes win.
-@app.api_route("/api/{path:path}", methods=["GET", "POST"])
-def api_not_implemented(path: str) -> JSONResponse:
-  return JSONResponse(
-    {"ok": False, "error": {"message": f"'/api/{path}' is not implemented in the Python client host yet."}}
-  )
+# ── Elicitation bridge ──
+@app.get("/api/elicitation/pending")
+def api_elicitation_pending() -> dict:
+  return {"pending": list_pending()}
+
+
+@app.post("/api/elicitation/{pending_id}/resolve")
+def api_elicitation_resolve(pending_id: str, body: dict = Body(default={})) -> JSONResponse:
+  return JSONResponse({"ok": resolve_pending(pending_id, body)})
 
 
 if __name__ == "__main__":
-  uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=True)
+  uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
