@@ -37,7 +37,12 @@ import {
 } from '../protocol/discovery.js';
 import { negotiateRevision, IncompatibleProtocolError } from '../protocol/negotiation.js';
 import { adoptLatestPollIntervalMs, isPollingTerminalResponse } from '../protocol/tasks-lifecycle.js';
-import { discriminateResultType, MrtrRoundGuard } from '../protocol/multi-round-trip.js';
+import {
+  discriminateResultType,
+  MrtrRoundGuard,
+  isLoadSheddingResult,
+  computeRetryBackoffMs,
+} from '../protocol/multi-round-trip.js';
 import {
   SUBSCRIPTIONS_LISTEN_METHOD,
   SUBSCRIPTIONS_ACKNOWLEDGED_METHOD,
@@ -587,6 +592,12 @@ export class Client {
    * Polls `tasks/get` until the task reaches a terminal status
    * (`completed`/`failed`/`cancelled`), then returns the final task object.
    * (§25.5) Honors `signal` and an overall `timeoutMs`.
+   *
+   * Resume after restart (§25.6): the `taskId` is opaque and server-durable, so a
+   * host that needs to survive a process restart simply persists the `taskId` it
+   * received from {@link createTask} (or any task-augmented call) and, on a fresh
+   * {@link Client}, calls this method with that id to resume polling — no in-SDK
+   * durable store is required (the persistence backend is the host's to choose).
    */
   async pollTaskUntilTerminal(
     taskId: string,
@@ -628,8 +639,27 @@ export class Client {
     const guard = new MrtrRoundGuard(options?.maxRounds ?? 16);
     const baseParams = req.params ?? {};
     let params: Record<string, unknown> = baseParams;
+    // Consecutive load-shedding rounds (no progress) → exponential backoff. (§11.5)
+    let loadShedAttempts = 0;
     for (;;) {
       const result = await this.request({ method: req.method, params }, options);
+      // §11.5 (R-11.5-m–p): a load-shedding result — `input_required` with NO inputRequests
+      // but a `requestState` — is NOT an error. The client MUST NOT treat it as one; it backs
+      // off (growing the delay on repeated non-progress), then retries echoing `requestState`.
+      if (isLoadSheddingResult(result)) {
+        const round = guard.recordRound();
+        if (!round.ok) throw new RequestError(-32603, `Multi-round-trip exceeded ${guard.maxRounds} rounds`);
+        const delayMs = computeRetryBackoffMs(++loadShedAttempts);
+        if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const requestState = result['requestState'];
+        params = {
+          ...baseParams,
+          ...(typeof requestState === 'string' ? { requestState } : {}),
+        };
+        continue;
+      }
+      // Progress (a real input request or a terminal result) resets the backoff window.
+      loadShedAttempts = 0;
       const decision = discriminateResultType(result, this.capabilities);
       if (decision.action === 'complete') return result;
       if (decision.action === 'error') {

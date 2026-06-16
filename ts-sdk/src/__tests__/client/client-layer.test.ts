@@ -346,6 +346,40 @@ describe('C2 — multi-round-trip (input-required) driver', () => {
     expect(retry.params.requestState).toBe('state-1');
     expect(retry.params.inputResponses.who).toEqual({ action: 'accept', content: { name: 'Ada' } });
   });
+
+  it('backs off and retries on a load-shedding input_required result, echoing requestState (S17, §11.5 R-11.5-m–p)', async () => {
+    const transport = new StubTransport();
+    const client = new Client(clientInfo, { capabilities: { elicitation: {} } });
+    client.connect(transport);
+    let calls = 0;
+    const sentRequestStates: Array<unknown> = [];
+    transport.onSend = (m) => {
+      if (m.id === undefined || m.method !== 'tools/call') return;
+      sentRequestStates.push(m.params?.requestState);
+      if (++calls === 1) {
+        // Load-shedding signal: input_required with a requestState but NO inputRequests.
+        transport.inject({ jsonrpc: '2.0', id: m.id, result: { resultType: 'input_required', requestState: 'shed-1' } });
+      } else {
+        transport.inject({ jsonrpc: '2.0', id: m.id, result: { resultType: 'complete', content: [{ type: 'text', text: 'ok' }] } });
+      }
+    };
+    const delays: number[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: any, ms?: number) => {
+      delays.push(Number(ms ?? 0));
+      return realSetTimeout(fn, 0);
+    }) as any);
+    try {
+      const result = await client.requestWithInput({ method: 'tools/call', params: { name: 'job' } });
+      expect((result.content as any[])[0].text).toBe('ok');
+      // It did NOT error on the load-shed; it backed off (computeRetryBackoffMs(1) = 250ms)…
+      expect(delays).toEqual([250]);
+      // …and the retry echoed the requestState verbatim (the first call carried none).
+      expect(sentRequestStates).toEqual([undefined, 'shed-1']);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('S45 RC-1 — client reacts to -32004 by reselecting the revision (§5.5, R-29.3-c)', () => {
