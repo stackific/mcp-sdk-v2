@@ -1,0 +1,19 @@
+# Vendored / reference code — not ours to format (the TS SDK is the parity reference).
+ts-sdk/
+
+# Dependencies, build output, and language-specific artifacts.
+node_modules/
+**/node_modules/
+**/dist/
+**/build/
+**/.venv/
+**/__pycache__/
+**/bin/
+**/obj/
+
+# Lockfiles and generated manifests.
+pnpm-lock.yaml
+**/uv.lock
+
+# Prose / docs are not held to the code formatter.
+**/*.md

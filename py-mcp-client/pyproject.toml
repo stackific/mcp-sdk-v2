@@ -1,13 +1,24 @@
 [project]
 name = "py-mcp-client"
 version = "0.1.0"
-description = "Placeholder Python MCP client host (FastAPI). Serves the companion frontend's REST + wire-debug surface; no real MCP implementation."
+description = "Python MCP client host (FastAPI) built on stackific-mcp (py-sdk). Hosts an MCP client against py-mcp-server and serves the companion frontend's REST + SSE surface — the real Python counterpart to ts-mcp-client."
 requires-python = ">=3.12"
 dependencies = [
+  "stackific-mcp",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
 ]
 
 [tool.uv]
-# Application, not a library — uv only manages the venv + deps.
 package = false
+
+[tool.uv.sources]
+stackific-mcp = { path = "../py-sdk", editable = true }
+
+[dependency-groups]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["."]

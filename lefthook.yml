@@ -1,0 +1,23 @@
+# Git hooks for the monorepo, managed by lefthook (https://lefthook.dev).
+#
+#   task setup     → `lefthook install`, wiring these hooks into the repo
+#   task prepush   → run the whole pre-push gate on demand (`lefthook run pre-push --all-files`)
+#   git push       → the pre-push gate runs automatically
+#
+# The gate mirrors what CI enforces so a failing push is caught locally first:
+# lint → format → build → test, run in order and stopping at the first failure.
+pre-push:
+  piped: true
+  commands:
+    # Static analysis / dead-import detection (ruff over the Python stacks).
+    1_lint:
+      run: task lint
+    # Prettier format check (JS/TS/JSON/CSS; .prettierignore excludes vendored code).
+    2_format:
+      run: task format:check
+    # Compile / typecheck every stack.
+    3_build:
+      run: task build
+    # Run the test suites.
+    4_test:
+      run: task test

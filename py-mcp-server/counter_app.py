@@ -1,0 +1,158 @@
+"""The Counter MCP App UI, inlined as a string served as the ``ui://counter`` resource.
+
+This document is rendered by the host inside a sandboxed iframe and talks to the host
+over postMessage (the MCP Apps bridge), so the embedded UI can request tool calls and
+report state without the host trusting the document's origin (§26).
+"""
+
+COUNTER_APP_HTML = """<!doctype html>
+<!--
+  MCP Apps (UI extension) payload.
+
+  This document is served by the MCP server as a `ui://` resource and rendered by the
+  host inside a sandboxed iframe. It talks to the host over postMessage — the MCP Apps
+  bridge — so the embedded UI can request tool calls and report state without the host
+  trusting the document's origin. This is the app's own self-contained UI; it is not
+  part of the SPA's source (hence a standalone .html file).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Counter App</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+        background: #0b1120;
+        color: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .card {
+        width: 100%;
+        max-width: 360px;
+        padding: 24px;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+        background: #0f172a;
+        text-align: center;
+      }
+      h1 {
+        font-size: 14px;
+        font-weight: 600;
+        color: #93c5fd;
+        margin: 0 0 4px;
+      }
+      p.sub {
+        font-size: 12px;
+        color: #64748b;
+        margin: 0 0 20px;
+      }
+      .count {
+        font-size: 48px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        margin: 8px 0 20px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      button {
+        font: inherit;
+        font-size: 14px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        background: #1e293b;
+        color: #e2e8f0;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #334155;
+      }
+      button.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #fff;
+      }
+      button.primary:hover {
+        background: #1d4ed8;
+      }
+      .from-host {
+        margin-top: 16px;
+        font-size: 12px;
+        color: #94a3b8;
+        min-height: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Counter — an MCP App</h1>
+      <p class="sub">Served as <code>ui://counter</code>, sandboxed, host-bridged.</p>
+      <div class="count" id="count" data-testid="app-count">0</div>
+      <div class="row">
+        <button id="dec" aria-label="decrement">−</button>
+        <button id="inc" aria-label="increment">+</button>
+        <button class="primary" id="send" data-testid="app-send">Send to host</button>
+      </div>
+      <div class="from-host" id="fromHost"></div>
+    </div>
+    <script>
+      let count = 0;
+      const el = document.getElementById('count');
+      const fromHost = document.getElementById('fromHost');
+      const render = () => {
+        el.textContent = String(count);
+      };
+
+      // Announce readiness to the host (MCP Apps lifecycle).
+      const post = (type, payload) =>
+        parent.postMessage({ source: 'mcp-app', app: 'counter', type, payload }, '*');
+      post('ready', {});
+
+      document.getElementById('inc').addEventListener('click', () => {
+        count++;
+        render();
+        post('state', { count });
+      });
+      document.getElementById('dec').addEventListener('click', () => {
+        count--;
+        render();
+        post('state', { count });
+      });
+      document.getElementById('send').addEventListener('click', () => post('submit', { count }));
+
+      // Receive messages from the host.
+      window.addEventListener('message', (e) => {
+        const msg = e.data;
+        if (!msg || msg.target !== 'mcp-app') return;
+        if (msg.type === 'set') {
+          count = Number(msg.payload?.count) || 0;
+          render();
+        }
+        if (msg.type === 'note') {
+          fromHost.textContent = 'host: ' + String(msg.payload?.text ?? '');
+        }
+      });
+    </script>
+  </body>
+</html>
+"""

@@ -27,8 +27,9 @@ export function SubscriptionsPage() {
           <CardTitle>subscriptions/listen</CardTitle>
           <CardDescription>
             Open a stream and opt in to tools/prompts/resources list_changed + updates for
-            docs://readme. This is the 2026-07-28 method: the server acknowledges the honored subset,
-            then only those notification types flow. Mutate the catalog (below) to watch them arrive.
+            docs://readme. This is the 2026-07-28 method: the server acknowledges the honored
+            subset, then only those notification types flow. Mutate the catalog (below) to watch
+            them arrive.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">

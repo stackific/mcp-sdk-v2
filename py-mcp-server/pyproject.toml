@@ -1,14 +1,25 @@
 [project]
 name = "py-mcp-server"
 version = "0.1.0"
-description = "Placeholder Python MCP server (FastAPI). Demonstrates the per-language server configuration; no real MCP implementation."
+description = "Python MCP reference server (FastAPI) built on stackific-mcp (py-sdk). Stateless Streamable HTTP, protocol 2026-07-28 — the real Python counterpart to ts-mcp-server."
 requires-python = ">=3.12"
 dependencies = [
+  "stackific-mcp",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
 ]
 
 [tool.uv]
-# This is an application, not a library — uv only manages the venv + deps and never
-# tries to build/install the project itself.
+# Application, not a library — uv only manages the venv + deps.
 package = false
+
+[tool.uv.sources]
+stackific-mcp = { path = "../py-sdk", editable = true }
+
+[dependency-groups]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["."]

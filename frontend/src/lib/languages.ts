@@ -5,8 +5,8 @@
  * changes which MCP *client host* (backend) the SPA talks to. Each stack runs its
  * own client on a fixed port (declared once in the root Taskfile and mirrored here
  * as defaults), so switching languages is just repointing the REST + wire-debug
- * base URL. The TypeScript stack is fully wired; Python and C# are runnable
- * placeholders that exist to demonstrate the switch.
+ * base URL. The TypeScript and Python stacks are fully wired (real MCP via their
+ * own SDKs); C# is a runnable placeholder that demonstrates the switch.
  */
 
 const env = import.meta.env;
@@ -36,9 +36,9 @@ export const LANGUAGES: readonly LanguageStack[] = [
   {
     id: 'python',
     label: 'Python',
-    tagline: 'FastAPI · uv',
+    tagline: 'FastAPI · uv · py-sdk',
     clientUrl: env.VITE_PY_CLIENT_URL ?? 'http://localhost:8102',
-    status: 'preview',
+    status: 'ready',
   },
   {
     id: 'csharp',

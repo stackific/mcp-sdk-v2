@@ -32,7 +32,12 @@ export function FoundationsPage() {
           <Button
             data-testid="run-foundations"
             disabled={status.loading}
-            onClick={() => status.run(async () => { await backend.discover(); return backend.status(); })}
+            onClick={() =>
+              status.run(async () => {
+                await backend.discover();
+                return backend.status();
+              })
+            }
           >
             Run
           </Button>

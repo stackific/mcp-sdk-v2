@@ -27,8 +27,8 @@ function LanguageSelector() {
         <CardDescription>
           Choose the implementation that backs this companion. The frontend is shared; your choice
           repoints it at that language's MCP client host — a different backend + server setup on its
-          own ports. <strong>TypeScript</strong> is fully wired; Python and C# are runnable
-          placeholders.
+          own ports. <strong>TypeScript</strong> and <strong>Python</strong> are fully wired (real
+          MCP via their SDKs); C# is a runnable placeholder.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -88,8 +88,8 @@ export function OverviewPage() {
         <>
           The page drives an MCP <strong>client that runs in the backend</strong> (the SDK's client
           runtime, hosted server-side), connected to the Hono MCP server over{' '}
-          <strong>Streamable HTTP</strong>. Every action you take streams its real JSON-RPC frames to
-          the panel on the right.
+          <strong>Streamable HTTP</strong>. Every action you take streams its real JSON-RPC frames
+          to the panel on the right.
         </>
       }
     >
@@ -135,9 +135,9 @@ export function OverviewPage() {
           <CardTitle>server/discover (Ch 9)</CardTitle>
           <CardDescription>
             In <span className="font-mono">2026-07-28</span>,{' '}
-            <span className="font-mono">server/discover</span> replaces the initialize handshake: one
-            round-trip returns the server's identity, capabilities, and supported revisions. Click
-            below to see the live result.
+            <span className="font-mono">server/discover</span> replaces the initialize handshake:
+            one round-trip returns the server's identity, capabilities, and supported revisions.
+            Click below to see the live result.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

@@ -43,7 +43,8 @@ export function AppsPage() {
       (c) =>
         c.type === 'resource' &&
         (c.resource?.uri === resourceUri ||
-          (typeof c.resource?.mimeType === 'string' && c.resource.mimeType.startsWith('text/html'))),
+          (typeof c.resource?.mimeType === 'string' &&
+            c.resource.mimeType.startsWith('text/html'))),
     );
     if (ui?.resource?.text) setHtml(ui.resource.text);
   }

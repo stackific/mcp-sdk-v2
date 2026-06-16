@@ -316,7 +316,10 @@ export const api = {
   // Call a tool with caller-supplied _meta (e.g. W3C traceparent) propagated on the wire.
   callToolWithMeta: (name: string, args: Record<string, unknown>, meta: Record<string, unknown>) =>
     withTrace(`tools/call:${name}`, () =>
-      client!.requestWithInput({ method: 'tools/call', params: { name, arguments: args, _meta: meta } }),
+      client!.requestWithInput({
+        method: 'tools/call',
+        params: { name, arguments: args, _meta: meta },
+      }),
     ),
   // Generic JSON-RPC passthrough for methods without a dedicated helper (ping, tasks/cancel,
   // subscriptions/listen, …) — surfaced transparently just like the typed calls.
