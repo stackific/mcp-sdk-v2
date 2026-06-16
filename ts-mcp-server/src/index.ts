@@ -36,6 +36,14 @@ serve({ fetch: app.fetch, port: MCP_PORT }, () => {
 
 // ── OAuth 2.1 Authorization Server + protected MCP resource (Hono) ──
 const authIssuer = process.env.AUTH_ISSUER ?? `http://localhost:${AUTH_PORT}`;
-serve({ fetch: createAuthApp({ issuer: authIssuer, resource: `${authIssuer}/mcp` }).fetch, port: AUTH_PORT }, () => {
-  console.log(`OAuth AS + protected MCP resource (Hono) on http://localhost:${AUTH_PORT}  (issuer ${authIssuer})`);
-});
+serve(
+  {
+    fetch: createAuthApp({ issuer: authIssuer, resource: `${authIssuer}/mcp` }).fetch,
+    port: AUTH_PORT,
+  },
+  () => {
+    console.log(
+      `OAuth AS + protected MCP resource (Hono) on http://localhost:${AUTH_PORT}  (issuer ${authIssuer})`,
+    );
+  },
+);

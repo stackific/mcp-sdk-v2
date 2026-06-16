@@ -10,7 +10,10 @@ import { McpServer, createMcpRequestHandler } from '@stackific/mcp-sdk-ts/server
 
 // A fake MCP server whose tools exercise the backend's server→client handlers.
 function buildFakeServer(): McpServer {
-  const server = new McpServer({ name: 'fake-server', version: '9.9.9' }, { tools: {}, sampling: {}, roots: {} });
+  const server = new McpServer(
+    { name: 'fake-server', version: '9.9.9' },
+    { tools: {}, sampling: {}, roots: {} },
+  );
   server.registerTool(
     'add',
     {
@@ -20,7 +23,9 @@ function buildFakeServer(): McpServer {
         required: ['a', 'b'],
       },
     },
-    async (args) => ({ content: [{ type: 'text', text: String((args.a as number) + (args.b as number)) }] }),
+    async (args) => ({
+      content: [{ type: 'text', text: String((args.a as number) + (args.b as number)) }],
+    }),
   );
   // Borrows the client's model → routes to the backend's sampling/createMessage handler.
   server.registerTool('summarize', {}, async (_args, ctx) => {
@@ -28,7 +33,11 @@ function buildFakeServer(): McpServer {
       messages: [{ role: 'user', content: { type: 'text', text: 'hello' } }],
       maxTokens: 16,
     });
-    return { content: [{ type: 'text', text: String((r as { content?: { text?: string } }).content?.text ?? '') }] };
+    return {
+      content: [
+        { type: 'text', text: String((r as { content?: { text?: string } }).content?.text ?? '') },
+      ],
+    };
   });
   // Asks for workspace roots → routes to the backend's roots/list handler.
   server.registerTool('show_roots', {}, async (_args, ctx) => {
@@ -41,7 +50,8 @@ function buildFakeServer(): McpServer {
 const handle = createMcpRequestHandler(buildFakeServer());
 
 beforeAll(() => {
-  vi.stubGlobal('fetch', ((url: string, init: RequestInit) => handle(new Request(url, init))) as unknown as typeof fetch);
+  vi.stubGlobal('fetch', ((url: string, init: RequestInit) =>
+    handle(new Request(url, init))) as unknown as typeof fetch);
 });
 afterAll(() => {
   vi.unstubAllGlobals();

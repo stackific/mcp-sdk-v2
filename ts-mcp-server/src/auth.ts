@@ -12,7 +12,12 @@
  */
 import { Hono } from 'hono';
 
-import { McpServer, toHonoMcpHandler, bearerAuthGate, buildProtectedResourceMetadata } from '@stackific/mcp-sdk-ts/server';
+import {
+  McpServer,
+  toHonoMcpHandler,
+  bearerAuthGate,
+  buildProtectedResourceMetadata,
+} from '@stackific/mcp-sdk-ts/server';
 
 // ── Web-Crypto helpers (edge-safe; no node:crypto) ──
 const textEncoder = new TextEncoder();
@@ -27,7 +32,9 @@ function randomBase64Url(n: number): string {
 }
 /** Random lowercase-hex string from `n` random bytes (for client secrets). */
 function randomHex(n: number): string {
-  return [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return [...crypto.getRandomValues(new Uint8Array(n))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 /** SHA-256 of `s`, base64url-encoded (PKCE S256 challenge derivation). */
 async function sha256Base64Url(s: string): Promise<string> {
@@ -75,21 +82,38 @@ export function createAuthApp(opts: { issuer: string; resource: string }) {
   );
   protectedMcp.registerTool(
     'whoami',
-    { title: 'Who am I', description: 'Returns the validated OAuth identity the server sees (ctx.authInfo).' },
+    {
+      title: 'Who am I',
+      description: 'Returns the validated OAuth identity the server sees (ctx.authInfo).',
+    },
     async (_args, ctx) => {
-      const info = ctx.authInfo as { clientId?: string; scopes?: string[]; expiresAt?: number } | undefined;
+      const info = ctx.authInfo as
+        | { clientId?: string; scopes?: string[]; expiresAt?: number }
+        | undefined;
       return {
         content: [
-          { type: 'text', text: `Authenticated as ${info?.clientId ?? 'unknown'} with scopes [${(info?.scopes ?? []).join(', ')}].` },
+          {
+            type: 'text',
+            text: `Authenticated as ${info?.clientId ?? 'unknown'} with scopes [${(info?.scopes ?? []).join(', ')}].`,
+          },
         ],
-        structuredContent: { clientId: info?.clientId, scopes: info?.scopes, expiresAt: info?.expiresAt },
+        structuredContent: {
+          clientId: info?.clientId,
+          scopes: info?.scopes,
+          expiresAt: info?.expiresAt,
+        },
       };
     },
   );
   protectedMcp.registerTool(
     'get_secret',
-    { title: 'Get Secret', description: 'Returns protected data that only an authorized caller may read.' },
-    async () => ({ content: [{ type: 'text', text: '🔐 The launch codes are 0000 (do not tell anyone).' }] }),
+    {
+      title: 'Get Secret',
+      description: 'Returns protected data that only an authorized caller may read.',
+    },
+    async () => ({
+      content: [{ type: 'text', text: '🔐 The launch codes are 0000 (do not tell anyone).' }],
+    }),
   );
 
   // The bearer gate (SDK bearerAuthGate): emits the 401 challenge for the
@@ -113,7 +137,13 @@ export function createAuthApp(opts: { issuer: string; resource: string }) {
 
   const issue = (clientId: string): IssuedToken => {
     const token = randomBase64Url(32);
-    const t: IssuedToken = { token, clientId, scope: SCOPE, audience: resource, expiresAt: Date.now() + 3600_000 };
+    const t: IssuedToken = {
+      token,
+      clientId,
+      scope: SCOPE,
+      audience: resource,
+      expiresAt: Date.now() + 3600_000,
+    };
     tokens.set(token, t);
     return t;
   };
@@ -139,14 +169,18 @@ export function createAuthApp(opts: { issuer: string; resource: string }) {
 
   // Protected Resource metadata (RFC 9728), built with the SDK helper.
   app.get('/.well-known/oauth-protected-resource', (c) =>
-    c.json(buildProtectedResourceMetadata({ resource, authorizationServers: [issuer], scopes: [SCOPE] })),
+    c.json(
+      buildProtectedResourceMetadata({ resource, authorizationServers: [issuer], scopes: [SCOPE] }),
+    ),
   );
 
   // Dynamic Client Registration (RFC 7591).
   app.post('/register', async (c) => {
     const body = await c.req
       .json<{ client_name?: string; grant_types?: string[]; redirect_uris?: string[] }>()
-      .catch(() => ({}) as { client_name?: string; grant_types?: string[]; redirect_uris?: string[] });
+      .catch(
+        () => ({}) as { client_name?: string; grant_types?: string[]; redirect_uris?: string[] },
+      );
     const clientId = `dcr-${crypto.randomUUID()}`;
     const clientSecret = randomHex(24);
     const grantTypes = body.grant_types?.length ? body.grant_types : ['authorization_code'];
@@ -176,7 +210,11 @@ export function createAuthApp(opts: { issuer: string; resource: string }) {
       const verifier = String(form.code_verifier ?? '');
       const redirectUri = String(form.redirect_uri ?? '');
       const rec = authCodes.get(code);
-      if (!rec) return c.json({ error: 'invalid_grant', error_description: 'Unknown or expired authorization code' }, 400);
+      if (!rec)
+        return c.json(
+          { error: 'invalid_grant', error_description: 'Unknown or expired authorization code' },
+          400,
+        );
       authCodes.delete(code); // single-use
       if (rec.redirectUri && rec.redirectUri !== redirectUri) {
         return c.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, 400);
@@ -185,22 +223,42 @@ export function createAuthApp(opts: { issuer: string; resource: string }) {
         rec.codeChallengeMethod === 'S256'
           ? (await sha256Base64Url(verifier)) === rec.codeChallenge
           : verifier === rec.codeChallenge;
-      if (!ok) return c.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, 400);
+      if (!ok)
+        return c.json(
+          { error: 'invalid_grant', error_description: 'PKCE verification failed' },
+          400,
+        );
       const t = issue(rec.clientId || clientId);
-      return c.json({ access_token: t.token, token_type: 'Bearer', expires_in: 3600, scope: t.scope });
+      return c.json({
+        access_token: t.token,
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: t.scope,
+      });
     }
 
     if (grant === 'client_credentials') {
       const clientSecret = String(form.client_secret ?? '');
       const client = clients.get(clientId);
       if (!client || client.clientSecret !== clientSecret) {
-        return c.json({ error: 'invalid_client', error_description: 'Unknown client or bad secret' }, 401);
+        return c.json(
+          { error: 'invalid_client', error_description: 'Unknown client or bad secret' },
+          401,
+        );
       }
       const t = issue(clientId);
-      return c.json({ access_token: t.token, token_type: 'Bearer', expires_in: 3600, scope: t.scope });
+      return c.json({
+        access_token: t.token,
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: t.scope,
+      });
     }
 
-    return c.json({ error: 'unsupported_grant_type', error_description: `grant_type ${grant} not supported` }, 400);
+    return c.json(
+      { error: 'unsupported_grant_type', error_description: `grant_type ${grant} not supported` },
+      400,
+    );
   });
 
   // Authorization endpoint: binds the code to the client + PKCE challenge, then

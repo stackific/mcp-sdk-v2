@@ -20,38 +20,158 @@ const BASE = 'http://localhost:8000';
 // Mirrors the sidebar NAV (app-layout.tsx). `/` first so the auto-connect runs.
 const PAGES = [
   { n: 1, to: '/', slug: 'overview', label: 'Overview & Discovery', group: 'I · Foundations' },
-  { n: 2, to: '/foundations', slug: 'foundations', label: 'Protocol Foundations', group: 'I · Foundations' },
-  { n: 3, to: '/json-model', slug: 'json-model', label: 'JSON Value Model', group: 'I · Foundations' },
+  {
+    n: 2,
+    to: '/foundations',
+    slug: 'foundations',
+    label: 'Protocol Foundations',
+    group: 'I · Foundations',
+  },
+  {
+    n: 3,
+    to: '/json-model',
+    slug: 'json-model',
+    label: 'JSON Value Model',
+    group: 'I · Foundations',
+  },
   { n: 4, to: '/jsonrpc', slug: 'jsonrpc', label: 'JSON-RPC Framing', group: 'I · Foundations' },
   { n: 5, to: '/meta', slug: 'meta', label: 'The _meta Envelope', group: 'I · Foundations' },
   { n: 6, to: '/stateless', slug: 'stateless', label: 'Stateless Model', group: 'I · Foundations' },
-  { n: 7, to: '/capabilities', slug: 'capabilities', label: 'Capabilities', group: 'I · Foundations' },
-  { n: 8, to: '/extensions', slug: 'extensions', label: 'Extensions Map', group: 'I · Foundations' },
-  { n: 9, to: '/transport', slug: 'transport', label: 'Transport & HTTP', group: 'II · Transports' },
-  { n: 10, to: '/mrtr', slug: 'mrtr', label: 'Multi-Round-Trip', group: 'III · Interaction & utilities' },
-  { n: 11, to: '/pagination', slug: 'pagination', label: 'Pagination', group: 'III · Interaction & utilities' },
-  { n: 12, to: '/caching', slug: 'caching', label: 'Caching', group: 'III · Interaction & utilities' },
-  { n: 13, to: '/content', slug: 'content', label: 'Content Blocks', group: 'III · Interaction & utilities' },
-  { n: 14, to: '/progress', slug: 'progress', label: 'Progress & Cancel', group: 'III · Interaction & utilities' },
-  { n: 15, to: '/logging', slug: 'logging', label: 'Logging', group: 'III · Interaction & utilities' },
-  { n: 16, to: '/tracing', slug: 'tracing', label: 'Tracing', group: 'III · Interaction & utilities' },
-  { n: 17, to: '/notifications', slug: 'notifications', label: 'Notifications', group: 'III · Interaction & utilities' },
-  { n: 18, to: '/subscriptions', slug: 'subscriptions', label: 'Subscriptions', group: 'III · Interaction & utilities' },
+  {
+    n: 7,
+    to: '/capabilities',
+    slug: 'capabilities',
+    label: 'Capabilities',
+    group: 'I · Foundations',
+  },
+  {
+    n: 8,
+    to: '/extensions',
+    slug: 'extensions',
+    label: 'Extensions Map',
+    group: 'I · Foundations',
+  },
+  {
+    n: 9,
+    to: '/transport',
+    slug: 'transport',
+    label: 'Transport & HTTP',
+    group: 'II · Transports',
+  },
+  {
+    n: 10,
+    to: '/mrtr',
+    slug: 'mrtr',
+    label: 'Multi-Round-Trip',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 11,
+    to: '/pagination',
+    slug: 'pagination',
+    label: 'Pagination',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 12,
+    to: '/caching',
+    slug: 'caching',
+    label: 'Caching',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 13,
+    to: '/content',
+    slug: 'content',
+    label: 'Content Blocks',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 14,
+    to: '/progress',
+    slug: 'progress',
+    label: 'Progress & Cancel',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 15,
+    to: '/logging',
+    slug: 'logging',
+    label: 'Logging',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 16,
+    to: '/tracing',
+    slug: 'tracing',
+    label: 'Tracing',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 17,
+    to: '/notifications',
+    slug: 'notifications',
+    label: 'Notifications',
+    group: 'III · Interaction & utilities',
+  },
+  {
+    n: 18,
+    to: '/subscriptions',
+    slug: 'subscriptions',
+    label: 'Subscriptions',
+    group: 'III · Interaction & utilities',
+  },
   { n: 19, to: '/tools', slug: 'tools', label: 'Tools', group: 'IV · Server features' },
   { n: 20, to: '/resources', slug: 'resources', label: 'Resources', group: 'IV · Server features' },
-  { n: 21, to: '/templates', slug: 'templates', label: 'Resource Templates', group: 'IV · Server features' },
+  {
+    n: 21,
+    to: '/templates',
+    slug: 'templates',
+    label: 'Resource Templates',
+    group: 'IV · Server features',
+  },
   { n: 22, to: '/prompts', slug: 'prompts', label: 'Prompts', group: 'IV · Server features' },
-  { n: 23, to: '/completion', slug: 'completion', label: 'Completion', group: 'IV · Server features' },
-  { n: 24, to: '/elicitation', slug: 'elicitation', label: 'Elicitation', group: 'V · Client features' },
+  {
+    n: 23,
+    to: '/completion',
+    slug: 'completion',
+    label: 'Completion',
+    group: 'IV · Server features',
+  },
+  {
+    n: 24,
+    to: '/elicitation',
+    slug: 'elicitation',
+    label: 'Elicitation',
+    group: 'V · Client features',
+  },
   { n: 25, to: '/sampling', slug: 'sampling', label: 'Sampling', group: 'V · Client features' },
   { n: 26, to: '/roots', slug: 'roots', label: 'Roots', group: 'V · Client features' },
   { n: 27, to: '/errors', slug: 'errors', label: 'Errors', group: 'VI · Errors & authorization' },
-  { n: 28, to: '/authorization', slug: 'authorization', label: 'Authorization', group: 'VI · Errors & authorization' },
+  {
+    n: 28,
+    to: '/authorization',
+    slug: 'authorization',
+    label: 'Authorization',
+    group: 'VI · Errors & authorization',
+  },
   { n: 29, to: '/tasks', slug: 'tasks', label: 'Tasks', group: 'VII · Extensions' },
   { n: 30, to: '/apps', slug: 'apps', label: 'MCP Apps (UI)', group: 'VII · Extensions' },
-  { n: 31, to: '/lifecycle', slug: 'lifecycle', label: 'Feature Lifecycle', group: 'VIII · Governance' },
+  {
+    n: 31,
+    to: '/lifecycle',
+    slug: 'lifecycle',
+    label: 'Feature Lifecycle',
+    group: 'VIII · Governance',
+  },
   { n: 32, to: '/security', slug: 'security', label: 'Security', group: 'VIII · Governance' },
-  { n: 33, to: '/conformance', slug: 'conformance', label: 'Conformance', group: 'VIII · Governance' },
+  {
+    n: 33,
+    to: '/conformance',
+    slug: 'conformance',
+    label: 'Conformance',
+    group: 'VIII · Governance',
+  },
   { n: 34, to: '/registries', slug: 'registries', label: 'Registries', group: 'VIII · Governance' },
 ];
 
@@ -77,7 +197,8 @@ page.on('requestfailed', (r) => {
   netFails.push({ url: r.url(), method: r.method(), error: f?.errorText });
 });
 page.on('response', (r) => {
-  if (r.status() >= 400) netFails.push({ url: r.url(), method: r.request().method(), status: r.status() });
+  if (r.status() >= 400)
+    netFails.push({ url: r.url(), method: r.request().method(), status: r.status() });
 });
 context.on('page', async (p) => {
   try {
@@ -110,21 +231,42 @@ for (const pg of PAGES) {
     await page.waitForSelector('main h1', { timeout: 8000 }).catch(() => {});
     await sleep(1200); // let auto-load effects (lists, status) run
 
-    record.header.title = (await page.locator('main h1').first().innerText().catch(() => '')) || '';
+    record.header.title =
+      (await page
+        .locator('main h1')
+        .first()
+        .innerText()
+        .catch(() => '')) || '';
     record.header.badges = await page
-      .$$eval('main h1 ~ * .inline-flex, main .mb-4 .inline-flex', (els) => els.map((e) => e.innerText.trim()).filter(Boolean))
+      .$$eval('main h1 ~ * .inline-flex, main .mb-4 .inline-flex', (els) =>
+        els.map((e) => e.innerText.trim()).filter(Boolean),
+      )
       .catch(() => []);
     record.header.description = clip(
-      await page.locator('main .mb-4 p').allInnerTexts().then((a) => a.join('\n')).catch(() => ''),
+      await page
+        .locator('main .mb-4 p')
+        .allInnerTexts()
+        .then((a) => a.join('\n'))
+        .catch(() => ''),
       900,
     );
     // Left column (the cards / interactive content).
     record.leftColumn = clip(
-      await page.locator('main .lg\\:grid-cols-2 > div').first().innerText().catch(() => ''),
+      await page
+        .locator('main .lg\\:grid-cols-2 > div')
+        .first()
+        .innerText()
+        .catch(() => ''),
       2500,
     );
-    record.footer.connStatus = await page.locator('[data-testid="conn-status"]').innerText().catch(() => null);
-    record.footer.protoVersion = await page.locator('[data-testid="proto-version"]').innerText().catch(() => null);
+    record.footer.connStatus = await page
+      .locator('[data-testid="conn-status"]')
+      .innerText()
+      .catch(() => null);
+    record.footer.protoVersion = await page
+      .locator('[data-testid="proto-version"]')
+      .innerText()
+      .catch(() => null);
   } catch (e) {
     record.load.navError = String(e?.message ?? e);
   }
@@ -183,11 +325,16 @@ for (const pg of PAGES) {
       // page isn't blocked and the originating tool call can complete and be observed.
       const modal = page.locator('[data-testid="elicitation-modal"]');
       if (await modal.count().catch(() => 0)) {
-        const modalText = (await modal.innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 220);
+        const modalText = (await modal.innerText().catch(() => ''))
+          .replace(/\s+/g, ' ')
+          .slice(0, 220);
         (record.elicitationModals ??= []).push({ afterButton: text, text: modalText });
         const resolve = modal.getByRole('button', { name: /Decline|Cancel/ });
         if (await resolve.count().catch(() => 0)) {
-          await resolve.first().click({ timeout: 2000 }).catch(() => {});
+          await resolve
+            .first()
+            .click({ timeout: 2000 })
+            .catch(() => {});
           await sleep(900);
         }
       }
@@ -205,13 +352,22 @@ for (const pg of PAGES) {
     if (!didClick) break;
   }
 
-  await page.screenshot({ path: resolve(SCREENS, `${String(pg.n).padStart(2, '0')}-${pg.slug}.png`), fullPage: true }).catch(() => {});
+  await page
+    .screenshot({
+      path: resolve(SCREENS, `${String(pg.n).padStart(2, '0')}-${pg.slug}.png`),
+      fullPage: true,
+    })
+    .catch(() => {});
 
-  record.load.consoleErrors = consoleMsgs.slice(startConsole).map((m) => `${m.type}: ${m.text}`.slice(0, 200));
+  record.load.consoleErrors = consoleMsgs
+    .slice(startConsole)
+    .map((m) => `${m.type}: ${m.text}`.slice(0, 200));
   record.load.pageErrors = pageErrors.slice(startErr);
   record.load.netFails = netFails.slice(startNet);
   results.push(record);
-  console.log(`[${pg.n}/${PAGES.length}] ${pg.to} — ${record.interactions.length} interactions, ${record.load.consoleErrors.length} console errs, ${record.load.netFails.length} net fails`);
+  console.log(
+    `[${pg.n}/${PAGES.length}] ${pg.to} — ${record.interactions.length} interactions, ${record.load.consoleErrors.length} console errs, ${record.load.netFails.length} net fails`,
+  );
 }
 
 // Theme toggle (sidebar footer) — an interaction outside <main>.
@@ -231,7 +387,10 @@ try {
   themeTest = { error: String(e?.message ?? e) };
 }
 
-writeFileSync(resolve(OUT, 'evidence.json'), JSON.stringify({ generatedFrom: BASE, pages: results, themeTest }, null, 2));
+writeFileSync(
+  resolve(OUT, 'evidence.json'),
+  JSON.stringify({ generatedFrom: BASE, pages: results, themeTest }, null, 2),
+);
 console.log('\nWROTE', resolve(OUT, 'evidence.json'));
 console.log('THEME', JSON.stringify(themeTest));
 

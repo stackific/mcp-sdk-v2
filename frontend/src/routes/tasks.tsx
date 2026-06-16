@@ -81,7 +81,9 @@ export function TasksPage() {
       <Card>
         <CardHeader>
           <CardTitle>long_job (taskSupport: required)</CardTitle>
-          <CardDescription>Augmented call → poll tasks/get → inline result. 4 background steps.</CardDescription>
+          <CardDescription>
+            Augmented call → poll tasks/get → inline result. 4 background steps.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">

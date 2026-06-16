@@ -15,6 +15,11 @@
 version: '3'
 
 vars:
+  # Pinned dev tools, run on demand via `uvx` (no project-dep pollution, reproducible).
+  RUFF: 'uvx ruff@0.15.17'
+  VULTURE: 'uvx vulture@2.16'
+  # The Python stacks ruff/vulture operate over.
+  PY_DIRS: 'py-sdk/src py-sdk/tests py-mcp-server py-mcp-client'
   FRONTEND_PORT: 8000
   TS_MCP_SERVER_PORT: 8001
   TS_MCP_CLIENT_PORT: 8002
@@ -39,11 +44,17 @@ tasks:
 
   # ── Setup / install ──────────────────────────────────────────────────────────
   setup:
-    desc: Install dependencies for every stack (Node/pnpm, Python/uv, .NET)
+    desc: Install the pre-push git hooks + dependencies for every stack (Node/pnpm, Python/uv, .NET)
     cmds:
+      - task: setup:hooks
       - task: setup:ts
       - task: setup:py
       - task: setup:csharp
+
+  setup:hooks:
+    desc: Install the lefthook-managed git hooks (pre-push quality gate)
+    cmds:
+      - lefthook install
 
   setup:ts:
     desc: Install the TypeScript stack (pnpm; postinstall links ts-sdk + ts-mcp-server)
@@ -232,3 +243,34 @@ tasks:
     desc: Format the repo (Prettier for JS/TS/JSON/Markdown)
     cmds:
       - pnpm format
+
+  format:check:
+    desc: Check formatting without writing (Prettier; .prettierignore excludes vendored code)
+    cmds:
+      - pnpm exec prettier --check .
+
+  # ── Quality gate (lint / dead code / pre-push) ─────────────────────────────────
+  prepush:
+    desc: Run the full pre-push gate (lint → format → build → test) via lefthook
+    cmds:
+      - lefthook run pre-push --all-files
+
+  lint:
+    desc: Lint every stack (Python via ruff; add other stacks here as they gain linters)
+    cmds:
+      - task: lint:py
+
+  lint:py:
+    desc: Ruff static analysis over the Python stacks (unused imports/vars, redefinitions, F-rules)
+    cmds:
+      - '{{.RUFF}} check {{.PY_DIRS}}'
+
+  lint:fix:
+    desc: Ruff with --fix — auto-eliminates unused imports and other safe fixes (Python)
+    cmds:
+      - '{{.RUFF}} check --fix {{.PY_DIRS}}'
+
+  deadcode:
+    desc: Report dead Python code (unused functions/classes/vars) via vulture — advisory
+    cmds:
+      - '{{.VULTURE}} py-sdk/src --min-confidence 80'

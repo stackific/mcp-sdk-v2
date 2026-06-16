@@ -1,0 +1,21 @@
+# Ruff configuration for the monorepo's Python stacks (py-sdk + the py-mcp client/server
+# apps). Discovered automatically by ruff when run from the repo root.
+#
+# Scope is deliberately FOCUSED on correctness and dead code rather than whole-repo style
+# reformatting: the codebase follows an intentional 2-space-indent house style, and turning
+# on the full style ruleset would bury the high-signal findings under thousands of E501-type
+# line-length notes. `task lint` therefore runs the pyflakes family (unused imports/locals,
+# redefinitions, undefined names, f-string mistakes) plus the always-safe E9 syntax checks.
+# Expand `lint.select` deliberately if/when the team opts into more style enforcement.
+target-version = "py312"
+line-length = 120
+indent-width = 2
+
+[lint]
+select = ["E9", "F"]
+
+[lint.per-file-ignores]
+# Package barrels (`__init__.py`) re-export their public surface; an import that is "unused"
+# inside the barrel is an intentional re-export, not dead code. (Ruff also honours an
+# explicit `import X as X` redundant alias as a re-export in non-barrel modules.)
+"__init__.py" = ["F401"]

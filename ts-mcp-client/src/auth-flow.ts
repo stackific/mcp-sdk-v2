@@ -89,8 +89,13 @@ export async function runAuthFlow(): Promise<{
   const prmUrl =
     /resource_metadata="([^"]+)"/.exec(wwwAuth)?.[1] ??
     `${AUTH_SERVER_URL}/.well-known/oauth-protected-resource`;
-  note('send', '2. discover protected-resource → authorization-server metadata (SDK)', { resourceMetadataUrl: prmUrl });
-  const discovered = await discoverOAuthMetadata({ resource: PROTECTED_MCP, resourceMetadataUrl: prmUrl });
+  note('send', '2. discover protected-resource → authorization-server metadata (SDK)', {
+    resourceMetadataUrl: prmUrl,
+  });
+  const discovered = await discoverOAuthMetadata({
+    resource: PROTECTED_MCP,
+    resourceMetadataUrl: prmUrl,
+  });
   const issuer = discovered.issuer;
   const asMeta = discovered.authorizationServer;
   add({
@@ -118,7 +123,10 @@ export async function runAuthFlow(): Promise<{
 
   // 4. Dynamic client registration via the SDK (sends the required application_type).
   note('send', '4. dynamic client registration (SDK)', { url: asMeta.registration_endpoint });
-  const reg = await registerClient(asMeta, { clientName: 'Companion SPA', redirectUris: [REDIRECT_URI] });
+  const reg = await registerClient(asMeta, {
+    clientName: 'Companion SPA',
+    redirectUris: [REDIRECT_URI],
+  });
   add({
     n: 4,
     title: 'Dynamic client registration (RFC 7591)',
@@ -140,7 +148,10 @@ export async function runAuthFlow(): Promise<{
     state,
     codeChallenge: pkce.codeChallenge,
   });
-  note('send', '5. GET authorize (PKCE S256, SDK URL)', { url: authUrl, code_challenge: pkce.codeChallenge });
+  note('send', '5. GET authorize (PKCE S256, SDK URL)', {
+    url: authUrl,
+    code_challenge: pkce.codeChallenge,
+  });
   const authRes = await httpFetch(authUrl, { redirect: 'manual' });
   const location = authRes.headers.get('location') ?? '';
   const redirectUrl = location ? new URL(location) : null;
@@ -165,7 +176,9 @@ export async function runAuthFlow(): Promise<{
   });
 
   // 6. Token exchange via the SDK (audience-bound by the RFC 8707 resource param).
-  note('send', '6. token exchange (authorization_code + PKCE, SDK)', { url: asMeta.token_endpoint });
+  note('send', '6. token exchange (authorization_code + PKCE, SDK)', {
+    url: asMeta.token_endpoint,
+  });
   const tokenJson = await exchangeAuthorizationCode(asMeta, {
     clientId: reg.clientId,
     code,

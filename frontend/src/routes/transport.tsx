@@ -102,8 +102,9 @@ export function TransportPage() {
               The HTTP status maps protocol conditions: 200 for a request answer (single JSON object
               or an SSE stream), 202 for an accepted notification or client response, 404 for an
               unknown path, and 405 for GET/DELETE (or any non-POST verb). A required-header,
-              routing-header, or <code>_meta</code> violation is rejected with 400 (<code>-32001</code>{' '}
-              or <code>-32602</code>); an unknown JSON-RPC <em>method</em> yields <code>-32601</code>.
+              routing-header, or <code>_meta</code> violation is rejected with 400 (
+              <code>-32001</code> or <code>-32602</code>); an unknown JSON-RPC <em>method</em>{' '}
+              yields <code>-32601</code>.
             </li>
             <li>
               The layer is stateless: no handshake and no session identifier. A server must not
