@@ -8,6 +8,8 @@
 - Never attribute any AI in any commit/PR description. All Git history is owned by humans
 - Always make signed commits
 - When asked create a PR only from a worktree
+- Never directly push code to origin/main, rather always through a PR
+- Each PR will be reviewed by human reviewers
 - Always create worktrees off origin/main in the .worktrees folder
 - Must write in-depth inline documentation in the code
 - Must write adequate tests to cover all scenarios including edge cases
