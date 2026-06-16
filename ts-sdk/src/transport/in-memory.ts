@@ -23,7 +23,7 @@ import {
   type TransportCloseInfo,
   type Unsubscribe,
 } from './contract.js';
-import { NewlineFramer, decodeMessageUnit, tryDecodeMessageUnit, type FrameDecoder } from './framing.js';
+import { NewlineFramer, tryDecodeMessageUnit, type FrameDecoder } from './framing.js';
 
 /**
  * One endpoint of an in-memory transport pair. Construct pairs via

@@ -1,0 +1,47 @@
+<!--
+  Stackific.Mcp — a from-the-spec implementation of the Model Context Protocol
+  (wire revision 2026-07-28) for .NET 10. This is the C# counterpart of the
+  TypeScript `@stackific/mcp-sdk-ts` package: protocol primitives, transports, and
+  the client + server runtimes.
+
+  The assembly references the ASP.NET Core shared framework so the server runtime
+  can plug into a Minimal API host, and the client transport can use HttpClient —
+  both ship in-framework. The one third-party dependency is JsonSchema.Net (the
+  json-everything project), which supplies a conformant JSON Schema 2020-12
+  validator for the §16.4 tool-argument / structured-content validation that the
+  spec mandates (a real validator rather than a hand-rolled subset).
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Stackific.Mcp</RootNamespace>
+    <AssemblyName>Stackific.Mcp</AssemblyName>
+    <PackageId>Stackific.Mcp</PackageId>
+    <Description>Model Context Protocol SDK for .NET (wire revision 2026-07-28): protocol types, Streamable HTTP transport, and client + server runtimes.</Description>
+
+    <!-- Public surface is fully documented (constitution: in-depth inline docs);
+         missing XML docs therefore fail the build rather than warn. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Grant the test project access to internal types (e.g. the client's CompletionThrottle) so they
+         can be unit-tested directly without widening the public API surface. -->
+    <InternalsVisibleTo Include="Stackific.Mcp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- JSON Schema 2020-12 validator (json-everything). Pinned to the 7.3.x line,
+         whose stable API surface — Json.Schema.JsonSchema.FromText / Evaluate with
+         EvaluationOptions { EvaluateAs = SpecVersion.Draft202012, OutputFormat =
+         OutputFormat.List } — backs Server/SchemaValidation.cs. -->
+    <PackageReference Include="JsonSchema.Net" Version="7.3.1" />
+  </ItemGroup>
+
+</Project>

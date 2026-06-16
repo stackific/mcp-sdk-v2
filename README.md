@@ -1,28 +1,30 @@
-# MCP V2 — Live Companion (multi-language, story-mapped)
+# MCP V2 SDK — with a full-featured demo (multi-language)
 
 A runnable companion to the **MCP V2 RC specification**. The shared frontend can be backed by any of
 several **language stacks** — pick one on the home page and it repoints at that stack's MCP **client
 host** (a different backend + server configuration on its own ports):
 
-| Stack          | Status        | MCP server         | Client host        | OAuth AS |
-| -------------- | ------------- | ------------------ | ------------------ | -------- |
-| **TypeScript** | ✅ full       | `ts-mcp-server` :8001 | `ts-mcp-client` :8002 | :8003    |
-| **Python**     | ✅ full       | `py-mcp-server` :8101 | `py-mcp-client` :8102 | :8103    |
-| **C#**         | 🧩 placeholder | `csharp-mcp-server` :8201 | `csharp-mcp-client` :8202 | —    |
+| Stack          | Status        | MCP server         | Client host        | OAuth AS | Tests |
+| -------------- | ------------- | ------------------ | ------------------ | -------- | ----- |
+| **TypeScript** | ✅ full       | `ts-mcp-server` :8001 | `ts-mcp-client` :8002 | :8003    | 3,018 |
+| **Python**     | ✅ full       | `py-mcp-server` :8101 | `py-mcp-client` :8102 | :8103    | 4,913 |
+| **C#**         | ✅ full       | `csharp-mcp-server` :8201 | `csharp-mcp-client` :8202 | :8203 | 3,478 |
 
-The shared **frontend** runs on **:8000**. The **TypeScript** and **Python** stacks are both full
-implementations, each on its own home-grown SDK (`ts-sdk` / `py-sdk`): they demonstrate **every** server
-and client capability — discovery, tools, resources, resource templates, prompts, completion, logging,
-list-changed + resource-updated subscriptions, progress + cooperative cancellation, the multi-round-trip
-loop (elicitation form+url, sampling, roots), caching, content blocks, tracing, pagination — plus the
-V2 RC extensions (**Tasks**, **Interactive UI / MCP Apps**) and **OAuth 2.1 authorization** (PKCE), all
-over **Streamable HTTP only** (single-JSON + lazy-commit SSE), with a live "under the hood" JSON-RPC wire
-view on every page. **C#** remains a runnable placeholder. Selecting a language swaps the entire backend
-+ server configuration.
+The shared **frontend** runs on **:8000**. The **TypeScript**, **Python**, and **C#** stacks are all full
+implementations, each on its own from-the-spec SDK (`ts-sdk` / `py-sdk` / `csharp-sdk` `Stackific.Mcp`):
+they demonstrate **every** server and client capability — discovery, tools, resources, resource templates,
+prompts, completion, logging, list-changed + resource-updated subscriptions, progress + cooperative
+cancellation, the multi-round-trip loop (elicitation form+url, sampling, roots), caching, content blocks,
+tracing, pagination — plus the V2 RC extensions (**Tasks**, **Interactive UI / MCP Apps**) and **OAuth 2.1
+authorization** (PKCE), all over **Streamable HTTP only** (single-JSON + lazy-commit SSE), with a live
+"under the hood" JSON-RPC wire view on every page. Selecting a language swaps the entire backend + server
+configuration.
 
-> Built on the home-grown `@stackific/mcp-sdk-ts` SDK (in `ts-sdk/`), whose client and server runtimes
-> speak the V2 RC revision `2026-07-28` — **stateless and handshake-less** (`server/discover` replaces
-> `initialize`; no `Mcp-Session-Id`). The active stack + negotiated version are shown live in the sidebar.
+> All three full stacks speak the V2 RC revision `2026-07-28` — **stateless and handshake-less**
+> (`server/discover` replaces `initialize`; no `Mcp-Session-Id`). The TypeScript stack uses
+> `@stackific/mcp-sdk-ts` (in `ts-sdk/`), the Python stack uses `stackific-mcp` (in `py-sdk/`), and the
+> C# stack uses `Stackific.Mcp` (in `csharp-sdk/`). The active stack + negotiated version are shown live
+> in the sidebar.
 
 ## Repository layout
 
@@ -32,10 +34,12 @@ ts-sdk/              @stackific/mcp-sdk-ts — the MCP SDK (client + server runt
 ts-mcp-client/       TypeScript MCP client host (Hono, :8002) — full implementation
 ts-mcp-server/       TypeScript reference MCP server + OAuth AS (Hono, :8001 / :8003)
 py-sdk/              stackific-mcp — the Python MCP SDK (client + server runtimes), parity port of ts-sdk
-py-mcp-client/       Python MCP client host on py-sdk (FastAPI, :8102)
-py-mcp-server/       Python reference MCP server on py-sdk (FastAPI, :8101)
-csharp-mcp-client/   C# MCP client host placeholder (.NET 10 Minimal API, :8202)
-csharp-mcp-server/   C# reference MCP server placeholder (.NET 10 Minimal API, :8201)
+py-mcp-client/       Python MCP client host on py-sdk (FastAPI, :8102) — full implementation
+py-mcp-server/       Python reference MCP server + OAuth AS on py-sdk (FastAPI, :8101 / :8103)
+csharp-sdk/          Stackific.Mcp — the MCP SDK for .NET 10 (client + server runtimes, built from the spec)
+csharp-sdk-tests/    xUnit test suite for Stackific.Mcp
+csharp-mcp-client/   C# MCP client host (.NET 10 Minimal API, :8202) — full implementation
+csharp-mcp-server/   C# reference MCP server + OAuth AS (.NET 10 Minimal API, :8201 / :8203)
 Taskfile.yml         The single entrypoint that drives the whole monorepo
 ```
 
@@ -94,11 +98,12 @@ whole demo. Set `MCP_SERVER_URL` / `AUTH_SERVER_URL` in `ts-mcp-client/.env`, th
 — the workspace install and app are unaffected. Step-by-step wiring + troubleshooting:
 **`CONNECT_YOUR_SERVER.md`**.
 
-## What's demonstrated (TypeScript stack)
+## What's demonstrated (every full stack)
 
-Every page carries a **Live wire** panel showing the colour-coded JSON-RPC frames as they cross the
-transport. The sidebar groups pages by the spec's build-story Parts (I–VIII) and tags each with its
-chapter + story id. Coverage spans all 46 stories:
+The **TypeScript**, **Python**, and **C#** stacks each cover all 46 build stories — pick a language on the
+home page and the same surface is served by that stack's own SDK. Every page carries a **Live wire** panel
+showing the colour-coded JSON-RPC frames as they cross the transport. The sidebar groups pages by the
+spec's build-story Parts (I–VIII) and tags each with its chapter + story id. Coverage spans all 46 stories:
 
 - **I · Foundations** — Overview & Discovery (S07–S09), Protocol Foundations (S01), JSON Value Model (S02),
   JSON-RPC Framing (S03–S04), the \_meta Envelope (S05), Stateless Model (S06), Capabilities (S10),
@@ -118,6 +123,9 @@ chapter + story id. Coverage spans all 46 stories:
 
 ```bash
 task typecheck    # typecheck/compile every stack without emitting
-task build        # build/compile every stack
-task format       # Prettier across JS/TS/JSON/Markdown
+task build        # build/compile every stack (TypeScript, Python, C#)
+task test         # run every stack's test suite (ts-sdk + ts-mcp-client, py-*, Stackific.Mcp xUnit)
+task lint         # lint every stack (Prettier check for JS/TS, Ruff for Python, dotnet format --verify for C#)
+task deadcode     # find dead/unused code (Knip for TS, Vulture for Python, Roslyn analyzers for C#)
+task format       # format every stack (Prettier for JS/TS/JSON/Markdown, dotnet format for C#)
 ```

@@ -28,7 +28,7 @@
  */
 
 import { z } from 'zod';
-import { NotificationParamsSchema, RequestParamsSchema } from '../jsonrpc/payload.js';
+import { RequestParamsSchema } from '../jsonrpc/payload.js';
 import { RequestIdSchema } from '../jsonrpc/framing.js';
 import type { RequestId } from '../jsonrpc/framing.js';
 import { MetaObjectSchema } from './meta.js';

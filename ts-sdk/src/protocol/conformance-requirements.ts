@@ -38,7 +38,7 @@
  *     `serverDeclares`, `computeMissingClientCapabilities` — `./capability-negotiation.js` (S10);
  *   - `TransportFamily`, `authorizationAppliesTo`, `authorizationForbiddenFor`,
  *     `credentialConveyanceFor` — `./authorization.js` (S35/S37);
- *   - `RECOGNIZED_INPUT_REQUEST_METHODS`, `MRTR_PARTICIPATING_METHODS` — `./multi-round-trip.js` (S17);
+ *   - `mayEmitInputRequestKind` (the runtime-enforced input-kind gate) — `./multi-round-trip.js` (S17);
  *   - `FeatureStatus` — `./conformance.js` (S43, NOT redefined).
  *
  * Out of scope (owned elsewhere, per the story §5): the definition of the error
@@ -49,7 +49,7 @@
  * authorization framework (S35–S37), and the consolidated registries (S46).
  */
 
-import { RESULT_TYPE, isKnownResultType, interpretResultType } from '../jsonrpc/payload.js';
+import { isKnownResultType, interpretResultType } from '../jsonrpc/payload.js';
 import {
   CURRENT_PROTOCOL_VERSION,
   isSupportedProtocolVersion,
@@ -73,7 +73,7 @@ import {
   authorizationForbiddenFor,
   credentialConveyanceFor,
 } from './authorization.js';
-import { RECOGNIZED_INPUT_REQUEST_METHODS } from './multi-round-trip.js';
+import { mayEmitInputRequestKind } from './multi-round-trip.js';
 
 /** Returns `true` when `value` is a non-null, non-array object. */
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -636,17 +636,17 @@ export const INPUT_REQUEST_REQUIRED_CAPABILITY: Readonly<Record<string, ClientCa
  * item 5, R-29.4-l) An unrecognized method is rejected (`false`): a server must
  * not solicit a kind it cannot tie to a declared capability.
  *
- * Reuses {@link RECOGNIZED_INPUT_REQUEST_METHODS} (S17) for the recognized-kind
- * set and {@link INPUT_REQUEST_REQUIRED_CAPABILITY} for the gating capability.
+ * Delegates to S17's {@link mayEmitInputRequestKind} — the SAME gate the live
+ * server now enforces in its solicitation path (`McpServer`'s `InputCollector`,
+ * rejecting an undeclared kind with `-32003`). Sharing one implementation keeps
+ * the conformance model and the runtime from drifting: this is no longer an
+ * unwired shadow-spec, it is the runtime's own gate expressed at the model layer.
  */
 export function mayPlaceInputRequest(
   method: string,
   clientCapabilities: Record<string, unknown>,
 ): boolean {
-  if (!RECOGNIZED_INPUT_REQUEST_METHODS.has(method as never)) return false;
-  const required = INPUT_REQUEST_REQUIRED_CAPABILITY[method];
-  if (required === undefined) return false;
-  return Object.prototype.hasOwnProperty.call(clientCapabilities, required);
+  return mayEmitInputRequestKind(method, clientCapabilities);
 }
 
 // ─── §29.6 — Robustness & forward compatibility ─────────────────────────────────

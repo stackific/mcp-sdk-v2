@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/csharp-sdk-tests/">
+    <Project Path="csharp-sdk-tests/Stackific.Mcp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/csharp-sdk/">
+    <Project Path="csharp-sdk/Stackific.Mcp.csproj" />
+  </Folder>
+  <Project Path="csharp-mcp-client/csharp-mcp-client.csproj" />
+  <Project Path="csharp-mcp-server/csharp-mcp-server.csproj" />
+</Solution>

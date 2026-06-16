@@ -74,6 +74,21 @@ describe('C3 — OAuth client', () => {
     ).not.toThrow();
   });
 
+  it('compares a PRESENT iss even when the flag is false/absent (mix-up defense, R-23.7-f)', () => {
+    // A mismatched iss MUST be rejected regardless of authorization_response_iss_parameter_supported.
+    expect(() =>
+      verifyAuthorizationRedirect({ sentState: 's', returnedState: 's', issuer: 'https://as.test', returnedIss: 'https://evil.test' }),
+    ).toThrow(/iss|mix-up/i);
+    // A matching iss with no advertised flag passes.
+    expect(() =>
+      verifyAuthorizationRedirect({ sentState: 's', returnedState: 's', issuer: 'https://as.test', returnedIss: 'https://as.test' }),
+    ).not.toThrow();
+    // No iss + flag false/absent → proceed (nothing to compare).
+    expect(() =>
+      verifyAuthorizationRedirect({ sentState: 's', returnedState: 's', issuer: 'https://as.test' }),
+    ).not.toThrow();
+  });
+
   it('rejects an AS metadata issuer that does not match (mix-up defense, §23.3)', async () => {
     const fetchImpl = (async (url: string) =>
       url.includes('oauth-protected-resource')

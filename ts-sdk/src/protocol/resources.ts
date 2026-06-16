@@ -32,7 +32,7 @@
 import { z } from 'zod';
 import { RESULT_TYPE } from '../jsonrpc/payload.js';
 import { PaginatedRequestParamsSchema, PaginatedResultSchema } from './pagination.js';
-import { CacheableResultSchema, CacheScopeSchema, type CacheScope } from './caching.js';
+import { CacheableResultSchema, type CacheScope } from './caching.js';
 import {
   serverDeclares,
   clientShouldExpectNotification,
@@ -160,7 +160,7 @@ export function mayEmitResourceUpdated(serverCaps: Record<string, unknown>): boo
 // ─── URI validation (§17.4, RFC3986) ───────────────────────────────────────────
 
 /** RFC3986 scheme: `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`. */
-const URI_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.\-]*:/;
+const URI_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
 
 /**
  * Returns `true` when `value` is a string in URI format [RFC3986] usable as a

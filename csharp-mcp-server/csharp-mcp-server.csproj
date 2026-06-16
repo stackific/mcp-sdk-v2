@@ -1,10 +1,19 @@
+<!--
+  The C# reference MCP server: the companion's server stack, built on the Stackific.Mcp SDK and
+  served over stateless Streamable HTTP (protocol 2026-07-28). Common build settings (TFM, nullable,
+  implicit usings) come from the repo-root Directory.Build.props.
+-->
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CSharpMcpServer</RootNamespace>
+    <!-- Reference host: deliberately demos the SDK's Deprecated-but-supported capabilities
+         (roots/sampling/logging), so the [Obsolete] usage diagnostics are silenced. -->
+    <NoWarn>$(NoWarn);CS0612;CS0618</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../csharp-sdk/Stackific.Mcp.csproj" />
+  </ItemGroup>
 
 </Project>

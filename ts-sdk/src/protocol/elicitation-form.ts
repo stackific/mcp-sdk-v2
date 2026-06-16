@@ -31,7 +31,6 @@
 import { z } from 'zod';
 import { RequestedSchemaSchema, ELICITATION_MODE } from './elicitation.js';
 import type { RequestedSchema, ElicitationMode } from './elicitation.js';
-import { ElicitResultSchema } from './multi-round-trip.js';
 import type { ElicitResult } from './multi-round-trip.js';
 
 /** Returns `true` when `value` is a non-null, non-array object (a JSON object). */

@@ -75,7 +75,7 @@ describe('isValidContinuationId (AC-06.11–AC-06.14 · R-4.5-a – R-4.5-d)', (
   });
 
   it('rejects bigint — not JSON-serializable', () => {
-    expect(isValidContinuationId(BigInt(9007199254740993))).toBe(false);
+    expect(isValidContinuationId(9007199254740993n)).toBe(false);
   });
 });
 

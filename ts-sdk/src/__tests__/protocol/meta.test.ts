@@ -57,7 +57,6 @@ import {
   isReservedMetaKeyPrefix,
   isValidMetaKeyName,
   isValidMetaKey,
-  parseMetaKey,
   isValidTraceparent,
   isValidTracestate,
   isValidBaggage,

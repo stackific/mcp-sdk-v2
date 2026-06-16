@@ -41,7 +41,6 @@ import {
   mayInvokeSampling,
   isDeprecatedClientCapability,
 } from './capability-negotiation.js';
-import { RESULT_TYPE } from '../jsonrpc/payload.js';
 import { INVALID_PARAMS_CODE } from './meta.js';
 
 // Re-export the reused bindings so the sampling surface is discoverable in one

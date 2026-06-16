@@ -182,6 +182,15 @@ describe('isValidTraceparent (AC-02.19 — R-2.6.2-i)', () => {
       isValidTraceparent('00-0AF7651916CD43DD8448EB211C80319C-00F067AA0BA902B7-01'),
     ).toBe(false);
   });
+
+  it('rejects the reserved version ff and all-zero trace/parent ids (R-2.6.2-i)', () => {
+    // Version 0xff is reserved/forbidden.
+    expect(isValidTraceparent('ff-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01')).toBe(false);
+    // An all-zero trace-id is the "invalid" sentinel.
+    expect(isValidTraceparent('00-00000000000000000000000000000000-00f067aa0ba902b7-01')).toBe(false);
+    // An all-zero parent-id is likewise invalid.
+    expect(isValidTraceparent('00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01')).toBe(false);
+  });
 });
 
 describe('isValidTracestate (R-4.2-l)', () => {

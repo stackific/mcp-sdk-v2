@@ -18,8 +18,6 @@ import { TransportError } from '../../transport/contract.js';
 import { PROTOCOL_VERSION_META_KEY } from '../../protocol/meta.js';
 import { StreamableHTTPClientTransport } from '../../client/streamable-http.js';
 
-const enc = new TextEncoder();
-
 /** A request message carrying a valid `_meta` envelope (only the version is read by the transport). */
 function request(id: number, method: string, params: Record<string, unknown> = {}): JSONRPCMessage {
   return {

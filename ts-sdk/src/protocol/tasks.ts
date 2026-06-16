@@ -43,7 +43,7 @@
  */
 
 import { z } from 'zod';
-import { RESULT_TYPE, McpErrorSchema } from '../jsonrpc/payload.js';
+import { McpErrorSchema } from '../jsonrpc/payload.js';
 import { InputRequestSchema, type InputRequest } from './multi-round-trip.js';
 import { MISSING_CLIENT_CAPABILITY_CODE, INVALID_PARAMS_CODE } from './meta.js';
 import {

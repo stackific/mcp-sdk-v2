@@ -56,7 +56,6 @@ import {
 import {
   isExtensionActive,
   mayEmitExtensionSurface,
-  extensionIdsMatch,
 } from './extension-mechanism.js';
 import { ResourceContentsSchema } from '../types/resource-contents.js';
 

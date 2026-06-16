@@ -79,8 +79,8 @@ importers:
         specifier: ^1.14.0
         version: 1.19.14(hono@4.12.25)
       '@stackific/mcp-sdk-ts':
-        specifier: file:../ts-sdk
-        version: file:ts-sdk
+        specifier: link:../ts-sdk
+        version: link:../ts-sdk
       ajv:
         specifier: ^8.17.1
         version: 8.20.0
@@ -824,9 +824,6 @@ packages:
   '@stablelib/base64@1.0.1':
     resolution: {integrity: sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==}
 
-  '@stackific/mcp-sdk-ts@file:ts-sdk':
-    resolution: {directory: ts-sdk, type: directory}
-
   '@tailwindcss/node@4.3.1':
     resolution: {integrity: sha512-6NDaqRoAMSXD1mr/RXu0HBvNE9a2n5tHPsxu9XHLws8o4Twes5rBM2205SUUiJ9goAtadrN6xTGX0UDEwp/N4A==}
 
@@ -1550,9 +1547,6 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
@@ -2007,11 +2001,6 @@ snapshots:
     optional: true
 
   '@stablelib/base64@1.0.1': {}
-
-  '@stackific/mcp-sdk-ts@file:ts-sdk':
-    dependencies:
-      ajv: 8.20.0
-      zod: 3.25.76
 
   '@tailwindcss/node@4.3.1':
     dependencies:
@@ -2693,7 +2682,5 @@ snapshots:
 
   yaml@2.9.0:
     optional: true
-
-  zod@3.25.76: {}
 
   zod@4.4.3: {}

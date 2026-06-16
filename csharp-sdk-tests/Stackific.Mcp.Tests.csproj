@@ -1,0 +1,38 @@
+<!--
+  Test suite for the Stackific.Mcp SDK. Per the constitution every scenario,
+  including edge cases, is covered here; tests are never weakened to pass.
+  Common build settings (TFM, nullable, implicit usings) come from the
+  repo-root Directory.Build.props.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- The suite deliberately constructs and round-trips the SDK's Deprecated-but-supported wire
+         surfaces (Roots, Sampling, Logging, includeContext, logLevel, DCR), so the [Obsolete] usage
+         diagnostics are silenced for the test project. -->
+    <NoWarn>$(NoWarn);CS0612;CS0618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../csharp-sdk/Stackific.Mcp.csproj" />
+  </ItemGroup>
+
+  <!-- Boot a real Kestrel host in the HTTP transport tests. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

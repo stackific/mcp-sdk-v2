@@ -15,7 +15,7 @@
     "@anthropic-ai/sdk": "^0.104.0",
     "@cfworker/json-schema": "^4.1.1",
     "@hono/node-server": "^1.14.0",
-    "@stackific/mcp-sdk-ts": "file:../ts-sdk",
+    "@stackific/mcp-sdk-ts": "link:../ts-sdk",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "hono": "^4.12.0",

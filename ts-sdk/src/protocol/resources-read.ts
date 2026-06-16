@@ -48,11 +48,9 @@
 import { z } from 'zod';
 import { RESULT_TYPE } from '../jsonrpc/payload.js';
 import { INVALID_PARAMS_CODE } from './meta.js';
-import { CacheableResultSchema, CacheScopeSchema, type CacheScope } from './caching.js';
+import { CacheableResultSchema, type CacheScope } from './caching.js';
 import {
   ResourceContentsSchema,
-  TextResourceContentsSchema,
-  BlobResourceContentsSchema,
   type ResourceContents,
 } from '../types/resource-contents.js';
 import { isResourceUri, ResourceUriSchema, mayAcceptResourceRequest } from './resources.js';
@@ -571,7 +569,7 @@ export const INODE_DIRECTORY_MIME_TYPE = 'inode/directory' as const;
  */
 export function uriScheme(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const match = /^([a-zA-Z][a-zA-Z0-9+.\-]*):/.exec(value);
+  const match = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(value);
   return match ? match[1]!.toLowerCase() : undefined;
 }
 

@@ -27,7 +27,7 @@ import {
   CLIENT_INFO_META_KEY,
   CLIENT_CAPABILITIES_META_KEY,
 } from '../../protocol/meta.js';
-import { Client, RequestError, StreamableHTTPClientTransport } from '../../client/index.js';
+import { Client, StreamableHTTPClientTransport } from '../../client/index.js';
 
 const clientInfo = { name: 'test-client', version: '0.0.1' };
 

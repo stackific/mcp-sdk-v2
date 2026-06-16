@@ -1,10 +1,20 @@
+<!--
+  The C# MCP client host: the backend the shared companion frontend talks to when "C#" is selected.
+  It hosts an MCP client (Stackific.Mcp SDK) connected to csharp-mcp-server over Streamable HTTP and
+  serves the REST + SSE surface the SPA expects. Common build settings come from the repo-root
+  Directory.Build.props.
+-->
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CSharpMcpClient</RootNamespace>
+    <!-- Reference host: deliberately demos the SDK's Deprecated-but-supported capabilities
+         (roots/sampling/logging), so the [Obsolete] usage diagnostics are silenced. -->
+    <NoWarn>$(NoWarn);CS0612;CS0618</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../csharp-sdk/Stackific.Mcp.csproj" />
+  </ItemGroup>
 
 </Project>

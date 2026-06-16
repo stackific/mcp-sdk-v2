@@ -48,14 +48,12 @@
  *   - the Deprecated state model — S43.
  */
 
-import { z } from 'zod';
 import {
   RESULT_TYPE,
   isKnownResultType,
 } from '../jsonrpc/payload.js';
 import {
   isValidMetaKeyPrefix,
-  isReservedMetaKeyPrefix,
   parseMetaKey,
   isValidMetaKeyName,
 } from '../json/meta-key.js';

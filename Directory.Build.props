@@ -1,0 +1,21 @@
+<!--
+  Shared MSBuild settings for every C# project in this monorepo (the Stackific.Mcp
+  SDK, its tests, and the reference server + client hosts). MSBuild discovers this
+  file by walking up from each .csproj, so the four C# projects inherit a single,
+  consistent toolchain. Non-.NET stacks (TypeScript, Python) are unaffected.
+
+  Per the repo constitution: .NET 10, 2-space indentation (see .editorconfig).
+-->
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Wire values are matched byte-for-byte; never let the host culture reshape
+         number/date formatting underneath the JSON layer. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Deterministic builds make the eventual review diff reproducible. -->
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

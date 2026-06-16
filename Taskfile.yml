@@ -29,11 +29,12 @@ vars:
   PY_AUTH_PORT: 8103
   CSHARP_MCP_SERVER_PORT: 8201
   CSHARP_MCP_CLIENT_PORT: 8202
+  CSHARP_AUTH_PORT: 8203
   # The full set of dev ports, derived from the above — consumed by `task stop`.
   ALL_PORTS: >-
     {{.FRONTEND_PORT}} {{.TS_MCP_SERVER_PORT}} {{.TS_MCP_CLIENT_PORT}} {{.TS_AUTH_PORT}}
     {{.PY_MCP_SERVER_PORT}} {{.PY_MCP_CLIENT_PORT}} {{.PY_AUTH_PORT}}
-    {{.CSHARP_MCP_SERVER_PORT}} {{.CSHARP_MCP_CLIENT_PORT}}
+    {{.CSHARP_MCP_SERVER_PORT}} {{.CSHARP_MCP_CLIENT_PORT}} {{.CSHARP_AUTH_PORT}}
 
 tasks:
   default:
@@ -158,19 +159,22 @@ tasks:
       - uv run python main.py
 
   csharp:server:
-    desc: C# MCP server placeholder (.NET 10 Minimal API, :8201)
+    desc: C# MCP server + OAuth AS (Stackific.Mcp SDK, :8201 / :8203)
     dir: csharp-mcp-server
     env:
       CSHARP_MCP_SERVER_PORT: '{{.CSHARP_MCP_SERVER_PORT}}'
+      CSHARP_AUTH_SERVER_PORT: '{{.CSHARP_AUTH_PORT}}'
     cmds:
       - dotnet watch run
 
   csharp:client:
-    desc: C# MCP client host placeholder (.NET 10 Minimal API, :8202)
+    desc: C# MCP client host (Stackific.Mcp SDK, :8202)
     dir: csharp-mcp-client
     env:
       CSHARP_MCP_CLIENT_PORT: '{{.CSHARP_MCP_CLIENT_PORT}}'
       CSHARP_MCP_SERVER_URL: 'http://localhost:{{.CSHARP_MCP_SERVER_PORT}}'
+      CSHARP_AUTH_SERVER_URL: 'http://localhost:{{.CSHARP_AUTH_PORT}}'
+      FRONTEND_URL: 'http://localhost:{{.FRONTEND_PORT}}'
     cmds:
       - dotnet watch run
 
@@ -188,6 +192,12 @@ tasks:
     cmds:
       - task: test:ts
       - task: test:py
+      - task: test:csharp
+
+  test:csharp:
+    desc: Run the Stackific.Mcp SDK test suite (xUnit)
+    cmds:
+      - dotnet test csharp-sdk-tests/Stackific.Mcp.Tests.csproj --nologo
 
   test:ts:
     desc: Run the TypeScript test suites (ts-sdk + ts-mcp-client)
@@ -218,9 +228,9 @@ tasks:
       - pnpm --dir ts-mcp-server typecheck
 
   build:csharp:
-    desc: Build the C# stack
+    desc: Build the whole C# stack (SDK + tests + server via the solution, then the client)
     cmds:
-      - dotnet build csharp-mcp-server/csharp-mcp-server.csproj --nologo
+      - dotnet build Stackific.Mcp.slnx --nologo
       - dotnet build csharp-mcp-client/csharp-mcp-client.csproj --nologo
 
   build:py:
@@ -240,7 +250,13 @@ tasks:
       - dotnet build csharp-mcp-client/csharp-mcp-client.csproj --nologo
 
   format:
-    desc: Format the repo (Prettier for JS/TS/JSON/Markdown)
+    desc: Format the repo (Prettier for JS/TS/JSON/Markdown, dotnet format for C#)
+    cmds:
+      - task: format:ts
+      - task: format:csharp
+
+  format:ts:
+    desc: Format JS/TS/JSON/Markdown with Prettier
     cmds:
       - pnpm format
 
@@ -249,6 +265,12 @@ tasks:
     cmds:
       - pnpm exec prettier --check .
 
+  format:csharp:
+    desc: Format the C# stack with dotnet format (whitespace + style + analyzer fixes, per .editorconfig)
+    cmds:
+      - dotnet format Stackific.Mcp.slnx
+      - dotnet format csharp-mcp-client/csharp-mcp-client.csproj
+
   # ── Quality gate (lint / dead code / pre-push) ─────────────────────────────────
   prepush:
     desc: Run the full pre-push gate (lint → format → build → test) via lefthook
@@ -256,9 +278,16 @@ tasks:
       - lefthook run pre-push --all-files
 
   lint:
-    desc: Lint every stack (Python via ruff; add other stacks here as they gain linters)
+    desc: Lint every stack (Prettier check for JS/TS, Ruff for Python, dotnet format --verify for C#)
     cmds:
+      - task: lint:ts
       - task: lint:py
+      - task: lint:csharp
+
+  lint:ts:
+    desc: Lint JS/TS/JSON/Markdown — verify Prettier formatting without writing
+    cmds:
+      - pnpm exec prettier --check .
 
   lint:py:
     desc: Ruff static analysis over the Python stacks (unused imports/vars, redefinitions, F-rules)
@@ -270,7 +299,34 @@ tasks:
     cmds:
       - '{{.RUFF}} check --fix {{.PY_DIRS}}'
 
+  lint:csharp:
+    desc: Lint the C# stack — verify formatting + code style/analyzers against .editorconfig (fails on any diff)
+    cmds:
+      - dotnet format Stackific.Mcp.slnx --verify-no-changes
+      - dotnet format csharp-mcp-client/csharp-mcp-client.csproj --verify-no-changes
+
+  # ── Dead code (find unused/unreachable code; non-mutating) ──────────────────────
   deadcode:
+    desc: Find dead/unused code across stacks (Knip for TS, Vulture for Python, Roslyn style analyzers for C#)
+    cmds:
+      - task: deadcode:ts
+      - task: deadcode:py
+      - task: deadcode:csharp
+
+  deadcode:ts:
+    desc: Find unused files, exports, and dependencies in the TypeScript workspaces (Knip, run via pnpm dlx)
+    cmds:
+      - pnpm dlx knip
+
+  deadcode:py:
     desc: Report dead Python code (unused functions/classes/vars) via vulture — advisory
     cmds:
-      - '{{.VULTURE}} py-sdk/src --min-confidence 80'
+      - '{{.VULTURE}} py-sdk/src py-mcp-server py-mcp-client --min-confidence 80'
+
+  deadcode:csharp:
+    desc: Surface dead C# code — unused private members/fields and redundant usings — via Roslyn style analyzers
+    cmds:
+      # `dotnet format style` runs the IDE code-style analyzers (IDE0005 unnecessary usings, IDE0051/IDE0052
+      # unused/unread private members, …); --verify-no-changes fails if any could be removed.
+      - dotnet format style Stackific.Mcp.slnx --verify-no-changes --severity info
+      - dotnet format style csharp-mcp-client/csharp-mcp-client.csproj --verify-no-changes --severity info

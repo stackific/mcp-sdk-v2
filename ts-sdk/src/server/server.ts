@@ -14,12 +14,48 @@
  * open on that request's own response stream and correlated by JSON-RPC id by the
  * transport, never by connection.
  */
-import { INVALID_PARAMS_CODE } from '../protocol/meta.js';
+import {
+  INVALID_PARAMS_CODE,
+  MISSING_CLIENT_CAPABILITY_CODE,
+  CLIENT_CAPABILITIES_META_KEY,
+  CLIENT_INFO_META_KEY,
+} from '../protocol/meta.js';
+import {
+  resolveElicitationMode,
+  gateElicitationRequest,
+  validateRequestedSchema,
+  isValidElicitationUrl,
+  ELICITATION_MODE,
+} from '../protocol/elicitation.js';
+import { gateSamplingToolUse } from '../protocol/sampling.js';
 import { validateValueAgainstSchema } from '../protocol/tools.js';
 import { buildDiscoverResult, CURRENT_PROTOCOL_VERSION, type DiscoverConfig } from '../protocol/discovery.js';
 import { RESULT_TYPE } from '../jsonrpc/payload.js';
-import { TASK_RESULT_TYPE, TASK_MISSING_CAPABILITY_CODE } from '../protocol/tasks.js';
-import { buildInputRequiredResult, type InputRequest } from '../protocol/multi-round-trip.js';
+import {
+  TASK_RESULT_TYPE,
+  TASK_MISSING_CAPABILITY_CODE,
+  mayReturnTaskHandle,
+  isTasksActiveForRequest,
+  buildTasksMissingCapabilityError,
+} from '../protocol/tasks.js';
+import {
+  buildInputRequiredResult,
+  mayEmitInputRequestKind,
+  buildMissingCapabilityForMrtrError,
+  requiredClientCapabilityForInputRequest,
+  isDeprecatedInputRequestKind,
+  type InputRequest,
+} from '../protocol/multi-round-trip.js';
+import { resolvedMinLogLevelIndex } from '../protocol/logging.js';
+import { emitDeprecationWarning, findDeprecatedEntry } from '../lifecycle/registry.js';
+import {
+  sanitizeToolOutputText,
+  enforceInputBounds,
+  ToolCallRateLimiter,
+  buildRateLimitRejection,
+  validateResourceUriAccess,
+  sanitizeFilePath,
+} from '../protocol/security.js';
 import type { CacheScope } from '../protocol/caching.js';
 import type { Implementation } from '../types/implementation.js';
 
@@ -127,6 +163,12 @@ export interface ToolDef {
   annotations?: Record<string, unknown>;
   /** Task-augmented tool: `{ taskSupport: 'required' | 'optional' }`. */
   execution?: { taskSupport: 'required' | 'optional' };
+  /**
+   * Reserved metadata published on this tool's `tools/list` entry — e.g.
+   * `_meta.ui` to advertise an Interactive UI surface (S41/S42, §26). Emitted
+   * verbatim so `McpServer` can advertise `_meta.ui` on a `tools/list` entry.
+   */
+  _meta?: Record<string, unknown>;
 }
 export type ToolHandler = (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>;
 
@@ -188,6 +230,14 @@ interface RegisteredPrompt {
 /** Log severities in ascending order (mirrors §15.3 / S23). */
 const LOG_LEVELS = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
 
+/**
+ * The reserved per-request `_meta` key carrying a request's logging opt-in. The
+ * 2026-07-28 spec removed `logging/setLevel`; logging is now a strictly
+ * per-request opt-in via this key (§15.3.3, §4.3 R-4.3-d). A request that does
+ * not set it receives NO `notifications/message`.
+ */
+const LOG_LEVEL_META_KEY = 'io.modelcontextprotocol/logLevel';
+
 /** Options for {@link McpServer}. */
 export interface McpServerOptions {
   /** Max items per page for the list methods (tools/resources/prompts). Default 50. (§12) */
@@ -200,18 +250,52 @@ export interface McpServerOptions {
   cacheTtlMs?: number;
   /** Default top-level `cacheScope` for cacheable results; default `'private'`. (§13.3) */
   cacheScope?: CacheScope;
+  /**
+   * Opt-in §28.3 rate limit for `tools/call`. When set, the server rejects a call
+   * that exceeds `maxInWindow` invocations per `windowMs` (per caller identity)
+   * with a `-32600` error rather than executing it. (R-28.3-g, R-28.3-h) Omitted
+   * ⇒ no rate limiting (back-compatible default; the embedder owns the policy).
+   */
+  toolCallRateLimit?: { maxInWindow: number; windowMs: number };
+  /**
+   * Opt-in §28.10 resource-access policy. When set, a `resources/read` URI is
+   * validated BEFORE it is dereferenced: it MUST parse as an absolute URI
+   * (R-28.10-f), resolve to a location `isAuthorizedLocation` permits (R-28.10-g),
+   * and — with `guardSsrf` — not target a private/loopback host (R-28.10-h).
+   */
+  resourceAccess?: { isAuthorizedLocation: (url: URL) => boolean; guardSsrf?: boolean };
+  /**
+   * Opt-in §28.10 authorized `file://` root. When set, the path of a `file://`
+   * `resources/read` URI is sanitized against this root and directory traversal
+   * (`..`, NUL bytes, absolute escapes) is rejected BEFORE any reader runs.
+   * (R-28.10-o, R-28.10-p)
+   */
+  fileResourceRoot?: string;
 }
+
+/**
+ * The Web Crypto symmetric-key type, derived structurally from the global
+ * `crypto.subtle` so the SDK needs no DOM lib (it targets `lib: ES2022` only).
+ */
+type ContinuationKey = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
 
 export class McpServer {
   private readonly tools = new Map<string, RegisteredTool>();
   private readonly resources = new Map<string, RegisteredResource>();
   private readonly templates: RegisteredTemplate[] = [];
   private readonly prompts = new Map<string, RegisteredPrompt>();
-  private logLevel = 'info';
   private taskStore?: TaskStore;
   private readonly pageSize: number;
   private readonly cacheTtlMs: number;
   private readonly cacheScope: CacheScope;
+  /** §28.3 tools/call rate limiter — present only when {@link McpServerOptions.toolCallRateLimit} is set. */
+  private readonly rateLimiter?: ToolCallRateLimiter;
+  /** §28.10 resource-access policy — present only when configured. */
+  private readonly resourceAccess?: McpServerOptions['resourceAccess'];
+  /** §28.10 authorized `file://` root — present only when configured. */
+  private readonly fileResourceRoot?: string;
+  /** Lazily-minted per-instance AES-GCM key protecting `requestState` tokens (§28.6). */
+  private stateKeyPromise?: Promise<ContinuationKey>;
 
   constructor(
     readonly info: Implementation,
@@ -221,6 +305,9 @@ export class McpServer {
     this.pageSize = options.pageSize ?? 50;
     this.cacheTtlMs = options.cacheTtlMs ?? 0;
     this.cacheScope = options.cacheScope ?? 'private';
+    if (options.toolCallRateLimit) this.rateLimiter = new ToolCallRateLimiter(options.toolCallRateLimit);
+    this.resourceAccess = options.resourceAccess;
+    this.fileResourceRoot = options.fileResourceRoot;
   }
 
   /**
@@ -293,8 +380,26 @@ export class McpServer {
   hasTool(name: string): boolean {
     return this.tools.has(name);
   }
-  get minLogLevel(): string {
-    return this.logLevel;
+
+  /**
+   * Returns the registered `inputSchema` for tool `name`, or `undefined`. The
+   * Streamable HTTP handler uses it to validate a `tools/call`'s `Mcp-Param-*`
+   * headers against the body before dispatch (§9.5.4, S14/S15).
+   */
+  toolInputSchema(name: string): Record<string, unknown> | undefined {
+    return this.tools.get(name)?.def.inputSchema;
+  }
+
+  /** Reads this request's declared client `extensions` map from `_meta.clientCapabilities`. */
+  private requestClientExtensions(ctx: RequestContext): unknown {
+    const caps = ctx.meta[CLIENT_CAPABILITIES_META_KEY];
+    return caps && typeof caps === 'object' ? (caps as Record<string, unknown>)['extensions'] : undefined;
+  }
+
+  /** Reads this request's full declared client capabilities map from `_meta` (§4.3). */
+  private requestClientCapabilities(ctx: RequestContext): Record<string, unknown> {
+    const caps = ctx.meta[CLIENT_CAPABILITIES_META_KEY];
+    return caps && typeof caps === 'object' && !Array.isArray(caps) ? (caps as Record<string, unknown>) : {};
   }
 
   /** Routes one JSON-RPC request to its handler, returning the `result` payload. */
@@ -308,11 +413,6 @@ export class McpServer {
         return this.initialize(params);
       case 'ping':
         return {};
-      case 'logging/setLevel': {
-        const level = params['level'];
-        if (typeof level === 'string') this.logLevel = level;
-        return {};
-      }
       case 'server/discover':
         return this.discover();
       case 'tools/list':
@@ -341,15 +441,15 @@ export class McpServer {
         return this.complete(params);
       case 'tasks/get':
         // §25.7: a GetTaskResult is the DetailedTask (with inline outcome) + resultType.
-        return this.taskOp('tasks/get', params, (store, id) => this.asComplete(store.getDetailed(id)));
+        return this.taskOp('tasks/get', params, ctx, (store, id) => this.asComplete(store.getDetailed(id)));
       case 'tasks/cancel':
-        return this.taskOp('tasks/cancel', params, (store, id) => {
+        return this.taskOp('tasks/cancel', params, ctx, (store, id) => {
           store.cancel(id);
           return this.asComplete(store.getDetailed(id));
         });
       case 'tasks/update':
         // §25.8: supply input to an input_required task, then return its DetailedTask.
-        return this.taskOp('tasks/update', params, (store, id) => {
+        return this.taskOp('tasks/update', params, ctx, (store, id) => {
           store.applyInput(id, (params['inputResponses'] ?? {}) as Record<string, unknown>);
           return this.asComplete(store.getDetailed(id));
         });
@@ -361,11 +461,21 @@ export class McpServer {
   private taskOp(
     method: string,
     params: Record<string, unknown>,
+    ctx: RequestContext,
     op: (store: TaskStore, taskId: string) => Record<string, unknown>,
   ): Record<string, unknown> {
     // C8 (§25.7): missing the Tasks capability is -32003, not -32601.
     if (!this.taskStore) {
       throw new ServerError(TASK_MISSING_CAPABILITY_CODE, `Tasks extension not supported (required for ${method})`);
+    }
+    // S40 (§25.7-c / §25.8-c / §25.9-c): a `tasks/*` method from a client that did
+    // NOT negotiate the Tasks extension for THIS request MUST be rejected with
+    // -32003 — the extension is active only when the client declared
+    // `io.modelcontextprotocol/tasks` AND the server advertises it. Without this
+    // gate an un-negotiated client could drive task state it never opted into.
+    if (!isTasksActiveForRequest(this.requestClientExtensions(ctx), this.capabilities['extensions'])) {
+      const e = buildTasksMissingCapabilityError(method);
+      throw new ServerError(e.code, e.message, e.data);
     }
     const taskId = params['taskId'];
     if (typeof taskId !== 'string') throw new ServerError(INVALID_PARAMS_CODE, 'taskId (string) is required');
@@ -401,7 +511,11 @@ export class McpServer {
   private paginate<T>(items: T[], key: string, params: Record<string, unknown>): Record<string, unknown> {
     let offset = 0;
     const cursor = params['cursor'];
-    if (typeof cursor === 'string' && cursor.length > 0) {
+    // §12.3 (S18-RQ-1, server role): a cursor is gated on PRESENCE, not truthiness —
+    // an empty-string `cursor:""` is a present cursor and MUST be decoded, not ignored
+    // as "first page". (This server's own cursors are non-empty base64 offsets, so `""`
+    // decodes to offset 0, but the gate must still treat it as supplied.)
+    if (typeof cursor === 'string') {
       offset = decodeCursorOffset(cursor);
       // m3 (§12.4): reject an undecodable, negative, OR out-of-bounds cursor with -32602.
       if (!Number.isInteger(offset) || offset < 0 || offset > items.length) {
@@ -424,6 +538,8 @@ export class McpServer {
       ...(t.def.outputSchema ? { outputSchema: t.def.outputSchema } : {}),
       ...(t.def.annotations ? { annotations: t.def.annotations } : {}),
       ...(t.def.execution ? { execution: t.def.execution } : {}),
+      // S41/S42 (§26): publish a tool's reserved `_meta` (e.g. `_meta.ui`) on its entry.
+      ...(t.def._meta ? { _meta: t.def._meta } : {}),
     }));
     return this.withCacheableHints(this.paginate(tools, 'tools', params));
   }
@@ -436,8 +552,23 @@ export class McpServer {
     const tool = this.tools.get(name)!;
     const args = (params['arguments'] ?? {}) as Record<string, unknown>;
 
-    // A schema violation is a PROTOCOL error (-32602), not a tool error.
+    // §28.3 (R-28.3-g, R-28.3-h): when a rate limit is configured, a tools/call that
+    // exceeds it MUST be rejected (-32600), not executed.
+    if (this.rateLimiter) {
+      const verdict = this.rateLimiter.check(this.rateLimitKey(ctx));
+      if (!verdict.allowed) {
+        const e = buildRateLimitRejection(verdict.retryAfterMs);
+        throw new ServerError(e.code, e.message, e.data);
+      }
+    }
+
     if (tool.def.inputSchema) {
+      // §28.10 (R-28.10-k, R-28.10-l): bound the resources consumed while validating —
+      // reject a pathologically deep schema OR an oversized argument payload before the
+      // (recursive) value validator runs on it.
+      const bounds = enforceInputBounds({ schema: tool.def.inputSchema, serializedPayload: JSON.stringify(args) });
+      if (!bounds.ok) throw new ServerError(INVALID_PARAMS_CODE, `Tool input rejected: ${bounds.reason}`);
+      // A schema violation is a PROTOCOL error (-32602), not a tool error.
       const verdict = validateValueAgainstSchema(tool.def.inputSchema, args);
       if (!verdict.valid) {
         throw new ServerError(INVALID_PARAMS_CODE, `Invalid arguments for ${name}: ${verdict.errors.join('; ')}`);
@@ -452,9 +583,26 @@ export class McpServer {
     // round's `inputResponses`); the first unanswered solicitation throws InputRequired, which
     // we convert into the input_required result the client's MRTR driver retries against.
     const inputResponses = (params['inputResponses'] ?? {}) as Record<string, unknown>;
-    const prior = typeof params['requestState'] === 'string' ? decodeRequestState(params['requestState'] as string) : {};
+    // §28.6 (R-28.6-a, R-28.6-b): the `requestState` continuation token is integrity-
+    // protected (authenticated encryption). Verify it on the way in; a tampered or
+    // forged token is REJECTED (-32602), never silently treated as empty state.
+    let prior: Record<string, unknown> = {};
+    if (typeof params['requestState'] === 'string') {
+      const decoded = await this.decodeRequestState(params['requestState'] as string);
+      if (!decoded.ok) {
+        throw new ServerError(
+          INVALID_PARAMS_CODE,
+          'Invalid or tampered requestState continuation token (R-28.6-b)',
+          { reason: 'integrity-validation-failed' },
+        );
+      }
+      prior = decoded.state;
+    }
     const accumulated = { ...prior, ...inputResponses };
-    const collector = new InputCollector(accumulated);
+    // The collector gates every solicitation against the client's per-request
+    // capabilities, so the server cannot emit an input-request kind the client
+    // never declared (§11.2-j / §11.5-g; S30–S33 server MUST NOTs).
+    const collector = new InputCollector(accumulated, this.requestClientCapabilities(ctx));
 
     let result: ToolResult;
     try {
@@ -463,11 +611,16 @@ export class McpServer {
       if (e instanceof InputRequired) {
         return buildInputRequiredResult(
           { [e.key]: e.request },
-          encodeRequestState(accumulated),
+          await this.encodeRequestState(accumulated),
         ) as unknown as Record<string, unknown>;
       }
       throw e;
     }
+
+    // §28.3 (R-28.3-i): sanitize tool-output text — strip control sequences a tool
+    // could smuggle into a result — before it is returned to the client.
+    result = sanitizeToolResult(result);
+
     // C12 (§16.5/§16.6): when a tool declares an outputSchema and returns
     // structuredContent (and is not reporting a tool error), it MUST conform.
     if (tool.def.outputSchema && result.structuredContent !== undefined && result.isError !== true) {
@@ -483,15 +636,94 @@ export class McpServer {
     // flattened with `resultType: "task"` (§25.3), NOT a nested `{ task }`. Otherwise
     // stamp the REQUIRED `resultType: "complete"` (§16.5).
     if (result && result.task !== undefined) {
-      return { resultType: TASK_RESULT_TYPE, ...(result.task as Record<string, unknown>) };
+      // S39 (§25.2, R-25.2-d): a server MUST NOT substitute a task handle unless the
+      // Tasks extension is active for THIS request (client declared it AND server
+      // advertises it). When it is not negotiated, return the ordinary result instead
+      // of leaking a task handle the client cannot consume.
+      if (mayReturnTaskHandle(this.requestClientExtensions(ctx), this.capabilities['extensions'])) {
+        return { resultType: TASK_RESULT_TYPE, ...(result.task as Record<string, unknown>) };
+      }
+      const { task: _ungated, ...ordinary } = result;
+      return this.asComplete(ordinary as Record<string, unknown>);
     }
     return this.asComplete(result as Record<string, unknown>);
+  }
+
+  /** A stable per-caller key for the §28.3 tools/call rate limiter (auth identity, else client id). */
+  private rateLimitKey(ctx: RequestContext): string {
+    const id = ctx.authInfo ?? ctx.meta[CLIENT_INFO_META_KEY] ?? 'anonymous';
+    return typeof id === 'string' ? id : JSON.stringify(id);
+  }
+
+  // ── §28.6 — requestState continuation-token integrity ──
+  //
+  // The 2026-07-28 model is stateless (§4.4, §9.9), so the continuation state is
+  // carried in the opaque `requestState` token itself rather than a server-side
+  // session. To honor R-28.6-a/b without reintroducing session state, the token is
+  // protected with authenticated encryption (AES-GCM) under a per-instance key:
+  // this gives BOTH integrity (tamper/forgery is detected) and confidentiality (the
+  // client cannot read the state), and authenticated decryption fails closed so a
+  // tampered token is rejected rather than acted upon. (A stateful single-use
+  // `ContinuationTokenStore` would protect integrity too, but would break the
+  // stateless guarantee across instances — statelessness wins per the spec.)
+
+  /** Lazily mints the per-instance AES-GCM key protecting `requestState` tokens. */
+  private getStateKey(): Promise<ContinuationKey> {
+    if (!this.stateKeyPromise) {
+      this.stateKeyPromise = crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt'],
+      ) as Promise<ContinuationKey>;
+    }
+    return this.stateKeyPromise;
+  }
+
+  /**
+   * Encodes accumulated multi-round-trip state into an integrity-protected,
+   * confidential `requestState` token the client echoes verbatim. (§28.6, R-28.6-a)
+   */
+  private async encodeRequestState(accumulated: Record<string, unknown>): Promise<string> {
+    const key = await this.getStateKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = new TextEncoder().encode(JSON.stringify(accumulated));
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext));
+    return `${base64UrlFromBytes(iv)}.${base64UrlFromBytes(ciphertext)}`;
+  }
+
+  /**
+   * Verifies and decodes a `requestState` token. Authenticated decryption fails
+   * closed, so a tampered/forged/foreign token yields `{ ok: false }` and the caller
+   * MUST reject it rather than act on its contents. (§28.6, R-28.6-b)
+   */
+  private async decodeRequestState(
+    token: string,
+  ): Promise<{ ok: true; state: Record<string, unknown> } | { ok: false }> {
+    const dot = token.indexOf('.');
+    if (dot <= 0 || dot === token.length - 1) return { ok: false };
+    let iv: Uint8Array;
+    let ciphertext: Uint8Array;
+    try {
+      iv = base64UrlToBytes(token.slice(0, dot));
+      ciphertext = base64UrlToBytes(token.slice(dot + 1));
+    } catch {
+      return { ok: false };
+    }
+    try {
+      const key = await this.getStateKey();
+      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+      const state = JSON.parse(new TextDecoder().decode(plaintext)) as unknown;
+      if (typeof state !== 'object' || state === null || Array.isArray(state)) return { ok: false };
+      return { ok: true, state: state as Record<string, unknown> };
+    } catch {
+      return { ok: false };
+    }
   }
 
   /** Builds the ergonomic tool context from the transport's RequestContext. */
   private toolContext(ctx: RequestContext, taskParam: { ttl?: number } | undefined, collector: InputCollector): ToolContext {
     const progressToken = ctx.meta['progressToken'] as string | number | undefined;
-    const self = this;
+    const serverName = this.info.name;
     return {
       meta: ctx.meta,
       signal: ctx.signal,
@@ -500,8 +732,15 @@ export class McpServer {
       taskRequested: taskParam !== undefined,
       taskTtlMs: taskParam?.ttl,
       log(level, message) {
-        if (LOG_LEVELS.indexOf(level) < LOG_LEVELS.indexOf(self.logLevel)) return;
-        ctx.notify({ method: 'notifications/message', params: { level, logger: self.info.name, data: message } });
+        // §15.3.3 (R-15.3.3-a/b/d): emit a `notifications/message` ONLY when THIS
+        // request opted in via `_meta.io.modelcontextprotocol/logLevel`, and only at
+        // or above that requested severity. With no opt-in nothing is emitted; there
+        // is no global/server log level (the 2026-07-28 spec removed `logging/setLevel`).
+        const minIndex = resolvedMinLogLevelIndex(ctx.meta[LOG_LEVEL_META_KEY]);
+        if (minIndex < 0) return;
+        const levelIndex = LOG_LEVELS.indexOf(level);
+        if (levelIndex < 0 || levelIndex < minIndex) return;
+        ctx.notify({ method: 'notifications/message', params: { level, logger: serverName, data: message } });
       },
       notify: (n) => ctx.notify(n),
       // §11: solicit client input via the input_required + retry mechanism, NOT a
@@ -544,6 +783,19 @@ export class McpServer {
   private async readResource(params: Record<string, unknown>): Promise<Record<string, unknown>> {
     const uri = params['uri'];
     if (typeof uri !== 'string') throw new ServerError(INVALID_PARAMS_CODE, 'resources/read requires a string uri');
+    // §28.10 (R-28.10-f/g/h): when a resource-access policy is configured, validate
+    // the URI BEFORE dereferencing it — a malformed, unauthorized, or SSRF-target URI
+    // is rejected rather than fetched.
+    if (this.resourceAccess) {
+      const verdict = validateResourceUriAccess(uri, this.resourceAccess);
+      if (!verdict.ok) throw new ServerError(INVALID_PARAMS_CODE, `Resource access denied: ${verdict.reason}`, { uri });
+    }
+    // §28.10 (R-28.10-o/p): when a `file://` root is configured, sanitize the path and
+    // reject directory traversal (`..`, NUL bytes, absolute escapes) before any reader.
+    if (this.fileResourceRoot !== undefined && uri.startsWith('file://')) {
+      const verdict = sanitizeFilePath(filePathFromUri(uri), this.fileResourceRoot);
+      if (!verdict.ok) throw new ServerError(INVALID_PARAMS_CODE, `Resource access denied: ${verdict.reason}`, { uri });
+    }
     const direct = this.resources.get(uri);
     if (direct) return this.readResult(uri, await direct.read(uri));
     for (const tpl of this.templates) {
@@ -659,6 +911,12 @@ class InputRequired {
   ) {}
 }
 
+/** Maps a Deprecated input-request kind to its deprecated-registry feature name (RC-7). */
+const DEPRECATED_INPUT_KIND_FEATURE: Readonly<Record<string, string>> = {
+  'sampling/createMessage': 'Sampling capability',
+  'roots/list': 'Roots capability',
+};
+
 /**
  * Maps a tool's input solicitations (elicitation/sampling/roots) to responses
  * already supplied by the client (via `requestState` + `inputResponses`), or
@@ -667,24 +925,122 @@ class InputRequired {
  */
 class InputCollector {
   private index = 0;
-  constructor(private readonly accumulated: Record<string, unknown>) {}
+  constructor(
+    private readonly accumulated: Record<string, unknown>,
+    /** The client's per-request declared capabilities (§4.3), gating each kind. */
+    private readonly clientCapabilities: Record<string, unknown>,
+  ) {}
   solicit(method: InputRequest['method'], params: Record<string, unknown>): Record<string, unknown> {
     const key = `in-${++this.index}`;
     if (key in this.accumulated) return this.accumulated[key] as Record<string, unknown>;
+    // S17 / S30–S33 (§11.2-j, §11.5-g): a server MUST NOT emit an input-request kind
+    // the client did not declare. Withhold it and reject with -32003 rather than
+    // soliciting an `elicitation/create` / `sampling/createMessage` / `roots/list`
+    // the client never opted into. (The gate runs only when the response is not
+    // already supplied — a previously-answered key implies the client supports it.)
+    if (!mayEmitInputRequestKind(method, this.clientCapabilities)) {
+      const cap = requiredClientCapabilityForInputRequest(method) ?? method;
+      const e = buildMissingCapabilityForMrtrError({ [cap]: {} });
+      throw new ServerError(e.code, e.message, e.data);
+    }
+    // S30 (§20.1, R-20.1-d MUST NOT): beyond the kind, an `elicitation/create`'s MODE
+    // must be one the client declared (form is implicit; url needs `elicitation.url`),
+    // and the outgoing params must be well-formed for that mode.
+    if (method === 'elicitation/create') {
+      const mode = resolveElicitationMode(params);
+      if (mode === undefined) {
+        throw new ServerError(
+          INVALID_PARAMS_CODE,
+          `Cannot solicit elicitation/create: unknown mode "${String(params['mode'])}" (§20.3)`,
+        );
+      }
+      const gate = gateElicitationRequest(this.clientCapabilities, mode);
+      if (!gate.ok) {
+        throw new ServerError(
+          MISSING_CLIENT_CAPABILITY_CODE,
+          gate.rejection.reason === 'mode-not-supported'
+            ? `Cannot solicit elicitation/create: the client does not support "${gate.rejection.mode}" mode (R-20.1-d)`
+            : 'Cannot solicit elicitation/create: the client did not declare the elicitation capability (R-20.1-e)',
+          { requiredCapabilities: { elicitation: mode === ELICITATION_MODE.URL ? { url: {} } : {} } },
+        );
+      }
+      if (mode === ELICITATION_MODE.FORM && params['requestedSchema'] !== undefined) {
+        const verdict = validateRequestedSchema(params['requestedSchema']);
+        if (!verdict.valid) {
+          throw new ServerError(INVALID_PARAMS_CODE, 'Cannot solicit elicitation/create: malformed requestedSchema (§20.4)');
+        }
+      }
+      if (mode === ELICITATION_MODE.URL && !isValidElicitationUrl(params['url'])) {
+        throw new ServerError(INVALID_PARAMS_CODE, 'Cannot solicit elicitation/create: url-mode request has no valid url (R-20.1-d)');
+      }
+    }
+    // S33 (§21.2.3, R-21.2.3-a MUST NOT): a `sampling/createMessage` carrying
+    // `tools`/`toolChoice` may only go to a client that declared `sampling.tools`.
+    if (method === 'sampling/createMessage') {
+      const gate = gateSamplingToolUse(this.clientCapabilities, params as { tools?: unknown; toolChoice?: unknown });
+      if (!gate.ok) {
+        throw new ServerError(gate.error.code, gate.error.message);
+      }
+    }
+    // RC-7 (§27.4): soliciting a Deprecated capability (sampling/roots) emits an
+    // advisory, OUT-OF-BAND deprecation warning — never on the wire — so an embedder
+    // notices it is exercising a feature scheduled for removal. (R-27.4-d/-e)
+    if (isDeprecatedInputRequestKind(method)) {
+      const entry = findDeprecatedEntry(DEPRECATED_INPUT_KIND_FEATURE[method] ?? '');
+      if (entry) emitDeprecationWarning(entry.feature, entry.migrationNote);
+    }
     throw new InputRequired(key, { method, params } as InputRequest);
   }
 }
 
-/** UTF-8-safe base64 encode/decode for the opaque `requestState` continuation token. (§11.3) */
-function encodeRequestState(accumulated: Record<string, unknown>): string {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(accumulated))));
+/**
+ * §28.3 (R-28.3-i): returns a copy of a tool result with control sequences stripped
+ * from every text content block, so a tool cannot smuggle ANSI/escape sequences
+ * into a result. Non-text blocks and `structuredContent` are left untouched; the
+ * input is never mutated and is returned as-is when nothing changed.
+ */
+function sanitizeToolResult(result: ToolResult): ToolResult {
+  if (!Array.isArray(result.content)) return result;
+  let changed = false;
+  const content = result.content.map((block) => {
+    if (block && typeof block === 'object' && (block as Record<string, unknown>)['type'] === 'text') {
+      const text = (block as Record<string, unknown>)['text'];
+      if (typeof text === 'string') {
+        const clean = sanitizeToolOutputText(text);
+        if (clean !== text) {
+          changed = true;
+          return { ...(block as Record<string, unknown>), text: clean };
+        }
+      }
+    }
+    return block;
+  });
+  return changed ? { ...result, content } : result;
 }
-function decodeRequestState(state: string): Record<string, unknown> {
+
+/** Extracts the (percent-decoded) path from a `file://` URI for traversal sanitization. */
+function filePathFromUri(uri: string): string {
   try {
-    return JSON.parse(decodeURIComponent(escape(atob(state)))) as Record<string, unknown>;
+    return decodeURIComponent(new URL(uri).pathname);
   } catch {
-    return {};
+    return uri;
   }
+}
+
+/** URL-safe base64 (no padding) encode of raw bytes — used for the `requestState` token. */
+function base64UrlFromBytes(bytes: Uint8Array): string {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Decodes URL-safe base64 (no padding) back to raw bytes; throws on malformed input. */
+function base64UrlToBytes(value: string): Uint8Array {
+  const b64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 /** Applies top-level JSON-Schema `default`s to absent arguments (used for optional inputs). */

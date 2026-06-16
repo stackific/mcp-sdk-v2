@@ -1,11 +1,11 @@
-// Placeholder C# MCP server (.NET 10 Minimal API).
-//
-// This is intentionally NOT a real MCP implementation. It exists to demonstrate that
-// selecting "C#" in the companion frontend wires up a *different stack of servers* —
-// this reference server plus its client host (csharp-mcp-client) — on its own ports.
-//
-// A real implementation would speak MCP's stateless Streamable HTTP (protocol
-// 2026-07-28) on /mcp, mirroring the TypeScript reference server (ts-mcp-server).
+// The C# reference MCP server, built on the Stackific.Mcp SDK and served over stateless Streamable
+// HTTP (protocol 2026-07-28) on /mcp — the C# counterpart of ts-mcp-server. The MCP dispatcher, tool
+// context, and Streamable HTTP adapter all live in the SDK; this entry point only registers features
+// (Features.cs) and binds them to an endpoint.
+
+using CSharpMcpServer;
+
+using Stackific.Mcp.Transport;
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
@@ -14,21 +14,20 @@ var app = builder.Build();
 app.MapGet("/health", () => Results.Json(new
 {
   status = "ok",
-  name = "csharp-mcp-server (placeholder)",
+  name = "companion-mcp-server (C#)",
   language = "csharp",
-  framework = "minimal-api",
   protocol = "2026-07-28",
   transport = "streamable-http",
 }));
 
-// Placeholder MCP endpoint (all HTTP methods). A real server would handle JSON-RPC here.
-app.Map("/mcp", () => Results.Json(new
-{
-  placeholder = true,
-  language = "csharp",
-  message = "csharp-mcp-server is a placeholder. A real implementation would speak MCP "
-    + "stateless Streamable HTTP (2026-07-28) here, like ts-mcp-server.",
-}));
+// The MCP endpoint: the SDK adapter parses, validates headers, dispatches, and streams (§9).
+app.MapMcp("/mcp", Features.Build());
+
+// OAuth 2.1 Authorization Server + a protected MCP resource (whoami / get_secret), on its own port —
+// the C# counterpart of ts-mcp-server's AUTH server. Runs alongside the main MCP server (§23).
+var authPort = Environment.GetEnvironmentVariable("CSHARP_AUTH_SERVER_PORT") ?? "8203";
+var issuer = Environment.GetEnvironmentVariable("CSHARP_AUTH_ISSUER") ?? $"http://localhost:{authPort}";
+_ = Auth.BuildAuthServer(issuer).RunAsync($"http://localhost:{authPort}");
 
 // Port is owned by the root Taskfile; this default matches it for standalone runs.
 var port = Environment.GetEnvironmentVariable("CSHARP_MCP_SERVER_PORT") ?? "8201";

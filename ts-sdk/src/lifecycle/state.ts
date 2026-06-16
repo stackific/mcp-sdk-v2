@@ -56,6 +56,12 @@ export interface DeprecatedRegistryEntry {
   definedIn: string;
   /** One-line migration guidance. (R-27.2-g) */
   migrationNote: string;
-  /** Protocol revision on or after which removal is eligible. */
+  /** The revision in which the feature first became Deprecated. (R-27.2) */
+  deprecatedSince: string;
+  /**
+   * Protocol revision on or after which removal is eligible. Per §27.2 this MUST
+   * be at least 12 months after {@link deprecatedSince}, so the removal-window
+   * rule can be evaluated against this row (see `lifecycle/policy.ts`). (R-27.2)
+   */
   earliestRemoval: string;
 }

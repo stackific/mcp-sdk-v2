@@ -184,7 +184,7 @@ export function effectiveCacheScope(scopes: ReadonlyArray<string>): CacheScope {
 /**
  * Maps each cacheable method name to the notification that signals a change.
  * When the notification arrives the client MUST discard the cached result and
- * re-fetch. (§13.5, R-13.5-a, R-13.5-j)
+ * re-fetch. (§13.5, R-13.5-a)
  */
 export const METHOD_TO_NOTIFICATION_MAP: Readonly<Record<string, string>> = {
   'tools/list': 'notifications/tools/list_changed',
@@ -196,7 +196,7 @@ export const METHOD_TO_NOTIFICATION_MAP: Readonly<Record<string, string>> = {
 
 /**
  * Returns the method names whose cached results should be invalidated when
- * `notification` is received. (R-13.5-j)
+ * `notification` is received. (§13.5, R-13.5-a)
  */
 export function methodsForNotification(notification: string): ReadonlyArray<string> {
   return Object.entries(METHOD_TO_NOTIFICATION_MAP)

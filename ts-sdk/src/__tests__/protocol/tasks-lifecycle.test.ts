@@ -66,7 +66,6 @@ import {
   GetTaskResultSchema,
   isGetTaskResult,
   buildGetTaskResult,
-  UpdateTaskRequestSchema,
   isUpdateTaskRequest,
   TaskInputResponsesSchema,
   validateUpdateInputResponseKeys,
