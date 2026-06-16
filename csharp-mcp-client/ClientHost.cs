@@ -37,7 +37,7 @@ public sealed class ClientHost
   };
 
   private readonly string _serverUrl;
-  private readonly bool _samplingViaModel;
+  private readonly SamplingProvider _sampling;
   private readonly AsyncLocal<string?> _trace = new();
   private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflight = new();
   private readonly ConcurrentDictionary<string, PendingElicitation> _pending = new();
@@ -52,11 +52,11 @@ public sealed class ClientHost
 
   /// <summary>Creates a client host targeting <paramref name="serverUrl"/>.</summary>
   /// <param name="serverUrl">The MCP server endpoint (for example <c>http://localhost:8201/mcp</c>).</param>
-  /// <param name="samplingViaModel">Whether a real model is configured for sampling (otherwise a deterministic mock).</param>
-  public ClientHost(string serverUrl, bool samplingViaModel)
+  /// <param name="sampling">The sampling provider backing the <c>sampling/createMessage</c> handler (DeepSeek or mock).</param>
+  public ClientHost(string serverUrl, SamplingProvider sampling)
   {
     _serverUrl = serverUrl;
-    _samplingViaModel = samplingViaModel;
+    _sampling = sampling;
   }
 
   /// <summary>The shared wire-frame bus relayed to <c>/debug/stream</c>.</summary>
@@ -65,8 +65,17 @@ public sealed class ClientHost
   /// <summary>The MCP server endpoint URL.</summary>
   public string ServerUrl => _serverUrl;
 
-  /// <summary>Whether sampling routes to a real model or the deterministic mock.</summary>
-  public string SamplingProvider => _samplingViaModel ? "model" : "mock";
+  /// <summary>The sampling info surfaced on <c>/health</c> and <c>/info</c> (provider, model, base URL, key presence).</summary>
+  public object SamplingInfo => new
+  {
+    provider = _sampling.Provider,
+    model = _sampling.ModelLabel,
+    baseUrl = _sampling.BaseUrl,
+    keyPresent = _sampling.HasKey,
+  };
+
+  /// <summary>A short provider label (<c>deepseek</c> or <c>mock</c>) for the <c>/health</c> probe.</summary>
+  public string SamplingProvider => _sampling.HasKey ? "deepseek" : "mock";
 
   /// <summary>Establishes (or no-ops on) a connection and runs discovery.</summary>
   /// <returns>A task that completes once connected.</returns>
@@ -232,20 +241,13 @@ public sealed class ClientHost
     return completion.Task.ContinueWith(t => Serialize(t.Result), TaskScheduler.Default);
   }
 
-  private Task<JsonNode> HandleSamplingAsync(JsonObject? parameters)
+  private async Task<JsonNode> HandleSamplingAsync(JsonObject? parameters)
   {
     Bus.Emit(new Frame(0, 0, "local", "note", McpMethods.SamplingCreateMessage,
-      Summary: "client handling sampling → mock model", Payload: parameters, Trace: _trace.Value));
-    var said = ExtractLastUserText(parameters);
-    var gist = string.Join(' ', said.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(16));
-    var result = new CreateMessageResult
-    {
-      Role = Role.Assistant,
-      Content = [SamplingContentBlocks.Text($"(mock model — configure a real model for a live answer)\nIn short: {gist}")],
-      Model = "mock-deepseek",
-      StopReason = "endTurn",
-    };
-    return Task.FromResult(Serialize(result));
+      Summary: $"client handling sampling → {(_sampling.HasKey ? "DeepSeek" : "mock model")}",
+      Payload: parameters, Trace: _trace.Value));
+    var result = await _sampling.SampleAsync(parameters).ConfigureAwait(false);
+    return Serialize(result);
   }
 
   private Task<JsonNode> HandleRootsAsync(JsonObject? _)
@@ -279,19 +281,6 @@ public sealed class ClientHost
   }
 
   private static object? AsId(JsonNode? node) => node is JsonValue value ? value.GetValue<object>() : null;
-
-  private static string ExtractLastUserText(JsonObject? parameters)
-  {
-    if (parameters?["messages"] is not JsonArray messages) return "";
-    for (var i = messages.Count - 1; i >= 0; i--)
-    {
-      if (messages[i] is JsonObject message && message["role"]?.GetValue<string>() == "user" && message["content"] is JsonArray content)
-      {
-        return string.Join('\n', content.OfType<JsonObject>().Where(b => b["type"]?.GetValue<string>() == "text").Select(b => b["text"]?.GetValue<string>() ?? ""));
-      }
-    }
-    return "";
-  }
 
   private static JsonNode Serialize<T>(T value) => JsonSerializer.SerializeToNode(value, McpJson.Options)!;
 

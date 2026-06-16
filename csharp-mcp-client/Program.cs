@@ -23,6 +23,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors(options =>
   options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
+// Pooled HttpClient instances for the outbound DeepSeek sampling calls and the transport probe.
+builder.Services.AddHttpClient();
+
 // Match the SDK's wire conventions: camelCase, omit nulls (so capability presence is preserved).
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -30,16 +33,29 @@ builder.Services.ConfigureHttpJsonOptions(options =>
   options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
-var serverUrl = (Environment.GetEnvironmentVariable("CSHARP_MCP_SERVER_URL") ?? "http://localhost:8201").TrimEnd('/');
+// Endpoints: prefer the C#-specific overrides, then fall back to the shared TS-app env names (so a
+// single .env drives both stacks), then the built-in defaults.
+var serverUrl = (Env("CSHARP_MCP_SERVER_URL", "MCP_SERVER_URL") ?? "http://localhost:8201").TrimEnd('/');
 if (!serverUrl.EndsWith("/mcp", StringComparison.Ordinal)) serverUrl += "/mcp";
 
-var authServerUrl = (Environment.GetEnvironmentVariable("CSHARP_AUTH_SERVER_URL") ?? "http://localhost:8203").TrimEnd('/');
+var authServerUrl = (Env("CSHARP_AUTH_SERVER_URL", "AUTH_SERVER_URL") ?? "http://localhost:8203").TrimEnd('/');
 var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "http://localhost:8000";
 
-var host = new ClientHost(serverUrl, samplingViaModel: false);
+// Sampling (DeepSeek via its Anthropic-compatible endpoint) — same env contract as ts-mcp-client.
+var deepSeekKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY") ?? "";
+var deepSeekBaseUrl = Environment.GetEnvironmentVariable("DEEPSEEK_BASE_URL") ?? "https://api.deepseek.com/anthropic";
+var deepSeekModel = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL") ?? "deepseek-chat";
+
+// Register the client host (and its sampling provider) as singletons so the minimal-API handlers and
+// the SSE relay all share one connected client and one wire-debug bus.
+builder.Services.AddSingleton(provider => new SamplingProvider(
+  provider.GetRequiredService<IHttpClientFactory>(), deepSeekKey, deepSeekBaseUrl, deepSeekModel));
+builder.Services.AddSingleton(provider => new ClientHost(serverUrl, provider.GetRequiredService<SamplingProvider>()));
 
 var app = builder.Build();
 app.UseCors();
+
+var host = app.Services.GetRequiredService<ClientHost>();
 
 // ── Diagnostics ──
 app.MapGet("/health", () => Results.Json(new { status = "ok", language = "csharp", sampling = host.SamplingProvider }));
@@ -47,7 +63,7 @@ app.MapGet("/info", () => Results.Json(new
 {
   name = "companion-mcp-client (C#)",
   language = "csharp",
-  sampling = new { provider = host.SamplingProvider },
+  sampling = host.SamplingInfo,
   serverUrl = host.ServerUrl,
   status = host.Status(),
 }));
@@ -164,26 +180,49 @@ app.MapPost("/api/elicitation/{id}/resolve", (string id, JsonObject body) =>
   return Results.Json(new { ok = host.ResolveElicitation(id, result) });
 });
 
-// ── Transport probe: a raw initialize-style POST exposing the actual request/response headers + status ──
-app.MapGet("/api/transport/probe", () => Run(async () =>
+// ── Transport probe: a raw Streamable HTTP handshake POST exposing the actual request/response
+// headers + status mapping (the C# counterpart of ts-mcp-client's transport.ts). The TS reference
+// POSTs `initialize`; the Stackific.Mcp server's modern entry point is `server/discover` carrying the
+// required `_meta` envelope (§4.3) and the `Mcp-Method` routing header (§9.4.1), so a faithful,
+// *successful* handshake round-trip against this server uses those conventions. ──
+app.MapGet("/api/transport/probe", (IHttpClientFactory httpClientFactory) => Run(async () =>
 {
-  using var http = new HttpClient();
+  var requestHeaders = new JsonObject
+  {
+    ["content-type"] = "application/json",
+    ["accept"] = "application/json, text/event-stream",
+    ["MCP-Protocol-Version"] = ProtocolRevision.Current,
+  };
+  var probeBody = new JsonObject
+  {
+    ["jsonrpc"] = "2.0",
+    ["id"] = 1,
+    ["method"] = McpMethods.Discover,
+    ["params"] = new JsonObject
+    {
+      ["_meta"] = new JsonObject
+      {
+        ["io.modelcontextprotocol/protocolVersion"] = ProtocolRevision.Current,
+        ["io.modelcontextprotocol/clientInfo"] = new JsonObject { ["name"] = "transport-probe", ["version"] = "0" },
+        ["io.modelcontextprotocol/clientCapabilities"] = new JsonObject(),
+      },
+    },
+  };
   var probe = new HttpRequestMessage(HttpMethod.Post, host.ServerUrl)
   {
-    Content = new StringContent(
-      """{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"transport-probe","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}""",
-      Encoding.UTF8, "application/json"),
+    Content = new StringContent(probeBody.ToJsonString(), Encoding.UTF8, "application/json"),
   };
   probe.Headers.Accept.ParseAdd("application/json");
   probe.Headers.Accept.ParseAdd("text/event-stream");
   probe.Headers.TryAddWithoutValidation("MCP-Protocol-Version", ProtocolRevision.Current);
   probe.Headers.TryAddWithoutValidation("Mcp-Method", McpMethods.Discover);
-  var requestHeaders = new JsonObject { ["content-type"] = "application/json", ["accept"] = "application/json, text/event-stream", ["MCP-Protocol-Version"] = ProtocolRevision.Current };
 
+  var http = httpClientFactory.CreateClient();
   using var response = await http.SendAsync(probe);
   var responseHeaders = new JsonObject();
   foreach (var header in response.Headers) responseHeaders[header.Key] = string.Join(", ", header.Value);
   foreach (var header in response.Content.Headers) responseHeaders[header.Key] = string.Join(", ", header.Value);
+  // Drain the body so the socket frees; we only need headers/status here.
   await response.Content.ReadAsStringAsync();
 
   return (object?)new
@@ -194,8 +233,9 @@ app.MapGet("/api/transport/probe", () => Run(async () =>
     status = (int)response.StatusCode,
     statusText = response.ReasonPhrase,
     contentType = response.Content.Headers.ContentType?.MediaType,
-    sessionId = (string?)null, // stateless: no Mcp-Session-Id (§9.9)
-    negotiatedVersion = ProtocolRevision.Current,
+    // Stateless server: no Mcp-Session-Id is minted (§9.9); surface it if a server ever does.
+    sessionId = response.Headers.TryGetValues("Mcp-Session-Id", out var sid) ? string.Join(", ", sid) : null,
+    negotiatedVersion = response.Headers.TryGetValues("Mcp-Protocol-Version", out var ver) ? string.Join(", ", ver) : ProtocolRevision.Current,
     responseHeaders,
   };
 }));
@@ -256,6 +296,18 @@ static async Task<IResult> Run(Func<Task<object?>> action)
 
 // Boxes a typed Task<T> result as Task<object?> for the uniform Run pipeline.
 static async Task<object?> Box<T>(Task<T> task) => await task;
+
+// Reads the first non-empty environment variable among the given names (C# override first, then the
+// shared TS-app name), or null when none is set — so one .env can drive both the C# and TS stacks.
+static string? Env(params string[] names)
+{
+  foreach (var name in names)
+  {
+    var value = Environment.GetEnvironmentVariable(name);
+    if (!string.IsNullOrEmpty(value)) return value;
+  }
+  return null;
+}
 
 static JsonNode? ToNode<T>(T value) => JsonSerializer.SerializeToNode(value, McpJson.Options);
 

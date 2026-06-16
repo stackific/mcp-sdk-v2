@@ -56,17 +56,25 @@ public static class AuthFlow
     using var http = new HttpClient(handler);
 
     // ── 1. Unauthenticated probe → expect 401 with a WWW-Authenticate challenge ──
-    Note("send", "1. unauthenticated initialize → protected resource");
+    // The TS reference POSTs `initialize`; against the Stackific.Mcp server the modern handshake is
+    // `server/discover` carrying the required `_meta` envelope (§4.3) and the `Mcp-Method` /
+    // `MCP-Protocol-Version` headers (§9.3.3/§9.4.1). Without them the request is rejected at the
+    // transport layer with a 400 *before* the bearer gate runs — so a faithful probe that actually
+    // reaches the gate (and elicits the 401 challenge) uses the server's conventions.
+    Note("send", "1. unauthenticated discover → protected resource");
     var probeBody = new JsonObject
     {
       ["jsonrpc"] = "2.0",
       ["id"] = 1,
-      ["method"] = "initialize",
+      ["method"] = McpMethods.Discover,
       ["params"] = new JsonObject
       {
-        ["protocolVersion"] = ProtocolRevision.Current,
-        ["capabilities"] = new JsonObject(),
-        ["clientInfo"] = new JsonObject { ["name"] = "probe", ["version"] = "0" },
+        ["_meta"] = new JsonObject
+        {
+          ["io.modelcontextprotocol/protocolVersion"] = ProtocolRevision.Current,
+          ["io.modelcontextprotocol/clientInfo"] = new JsonObject { ["name"] = "probe", ["version"] = "0" },
+          ["io.modelcontextprotocol/clientCapabilities"] = new JsonObject(),
+        },
       },
     };
     using var probeRequest = new HttpRequestMessage(HttpMethod.Post, protectedMcp)
@@ -74,6 +82,8 @@ public static class AuthFlow
       Content = new StringContent(probeBody.ToJsonString(), System.Text.Encoding.UTF8, "application/json"),
     };
     probeRequest.Headers.TryAddWithoutValidation("Accept", "application/json, text/event-stream");
+    probeRequest.Headers.TryAddWithoutValidation("MCP-Protocol-Version", ProtocolRevision.Current);
+    probeRequest.Headers.TryAddWithoutValidation("Mcp-Method", McpMethods.Discover);
     using var probe = await http.SendAsync(probeRequest).ConfigureAwait(false);
     var wwwAuth = probe.Headers.TryGetValues("WWW-Authenticate", out var challengeValues)
       ? string.Join(", ", challengeValues)

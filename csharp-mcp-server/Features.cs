@@ -231,8 +231,12 @@ public static class Features
           await ctx.NotifySubscribersAsync(new JsonRpcNotification(method));
         }
         await ctx.NotifySubscribersAsync(new JsonRpcNotification(McpMethods.NotificationsResourcesUpdated, new JsonObject { ["uri"] = "docs://readme" }));
-        // …and emit on this request's own stream so the Notifications view (no subscription) sees them.
+        // …and emit the same four on this request's own stream so the Notifications view (no
+        // subscription) sees them, mirroring ts-mcp-server's send{Tool,Prompt,Resource}ListChanged +
+        // sendResourceUpdated.
         await ctx.NotifyAsync(new JsonRpcNotification(McpMethods.NotificationsToolsListChanged));
+        await ctx.NotifyAsync(new JsonRpcNotification(McpMethods.NotificationsPromptsListChanged));
+        await ctx.NotifyAsync(new JsonRpcNotification(McpMethods.NotificationsResourcesListChanged));
         await ctx.NotifyAsync(new JsonRpcNotification(McpMethods.NotificationsResourcesUpdated, new JsonObject { ["uri"] = "docs://readme" }));
         return CallToolResult.FromText("Emitted list_changed + resources/updated to subscribers and on this stream.");
       });
