@@ -20,7 +20,9 @@ dependencies, each a clean seam:
 from __future__ import annotations
 
 import base64
+import json
 import re
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -32,6 +34,11 @@ from mcp.protocol.errors import (
 )
 from mcp.protocol.meta import CURRENT_PROTOCOL_VERSION
 from mcp.jsonrpc.payload import RESULT_TYPE_COMPLETE
+from mcp.protocol.multi_round_trip import build_input_required_result
+from mcp.protocol.tasks import (
+  TASK_MISSING_CAPABILITY_CODE,
+  build_tasks_missing_capability_error,
+)
 
 #: Log severities in ascending order (mirrors §15.3).
 LOG_LEVELS = ("debug", "info", "notice", "warning", "error", "critical", "alert", "emergency")
@@ -46,6 +53,76 @@ ValueValidator = Callable[[dict, object], "tuple[bool, list[str]]"]
 
 def _permissive_validator(_schema: dict, _value: object) -> tuple[bool, list[str]]:
   return True, []
+
+
+class CancelSignal:
+  """A cooperative cancellation signal handed to a tool via :attr:`ToolContext.signal`.
+
+  Mirrors the browser ``AbortSignal`` the TS SDK uses: a tool polls
+  :attr:`aborted` between steps, or sleeps interruptibly with :meth:`wait`. The
+  transport calls :meth:`abort` when the client sends ``notifications/cancelled``
+  referencing the in-flight request id (§15.2).
+  """
+
+  def __init__(self) -> None:
+    self._event = threading.Event()
+
+  @property
+  def aborted(self) -> bool:
+    """``True`` once the request has been cancelled."""
+    return self._event.is_set()
+
+  def abort(self) -> None:
+    """Mark the request cancelled (idempotent)."""
+    self._event.set()
+
+  def wait(self, timeout: float) -> bool:
+    """Sleep up to ``timeout`` seconds, returning early ``True`` if aborted meanwhile."""
+    return self._event.wait(timeout)
+
+
+class InputRequired(Exception):
+  """Raised by a tool's ``elicit_input``/``create_message``/``list_roots`` when the
+  matching client input is not yet available — caught by :class:`McpServer` and
+  converted into an ``input_required`` result for the §11 retry loop.
+  """
+
+  def __init__(self, key: str, request: dict) -> None:
+    super().__init__(key)
+    self.key = key
+    self.request = request
+
+
+class _InputCollector:
+  """Maps a tool's input solicitations to responses the client already supplied (via
+  ``requestState`` + ``inputResponses``), or raises :class:`InputRequired` for the
+  first one not yet answered. Keys are a stable per-call-site counter (§11).
+  """
+
+  def __init__(self, accumulated: dict) -> None:
+    self._accumulated = accumulated
+    self._index = 0
+
+  def solicit(self, method: str, params: dict) -> dict:
+    self._index += 1
+    key = f"in-{self._index}"
+    if key in self._accumulated:
+      return self._accumulated[key]
+    raise InputRequired(key, {"method": method, "params": params})
+
+
+def _encode_request_state(accumulated: dict) -> str:
+  """Encode the accumulated input responses as an opaque base64 continuation token (§11.3)."""
+  return base64.b64encode(json.dumps(accumulated).encode("utf-8")).decode("ascii")
+
+
+def _decode_request_state(state: str) -> dict:
+  """Decode an opaque ``requestState`` token back to accumulated responses; ``{}`` on failure."""
+  try:
+    decoded = json.loads(base64.b64decode(state.encode("ascii")).decode("utf-8"))
+    return decoded if isinstance(decoded, dict) else {}
+  except (ValueError, TypeError):
+    return {}
 
 
 class ServerError(Exception):
@@ -72,6 +149,12 @@ class ServerRequestContext:
   meta: dict = field(default_factory=dict)
   #: Emits a notification on this request's stream (no-op by default).
   notify: Callable[[dict], None] = lambda _n: None
+  #: Aborts when the client cancels this request (``notifications/cancelled``, §15.2).
+  signal: CancelSignal = field(default_factory=CancelSignal)
+  #: Transport-resolved caller identity (e.g. a validated bearer token), if any.
+  auth_info: object = None
+  #: Broadcasts a change notification to active subscription streams (§10.5/§10.6).
+  notify_subscribers: Callable[[dict], None] = lambda _n: None
 
 
 @dataclass
@@ -84,6 +167,27 @@ class ToolContext:
   task_ttl_ms: int | None
   notify: Callable[[dict], None]
   log: Callable[[str, str], None]
+  #: Cancellation signal — a tool polls ``signal.aborted`` / sleeps via ``signal.wait``.
+  signal: CancelSignal = field(default_factory=CancelSignal)
+  #: Validated caller identity threaded from the auth gate (``ctx.auth_info``), if any.
+  auth_info: object = None
+  #: Solicit structured user input (§11/§20). Returns the supplied response or raises
+  #: :class:`InputRequired` for the §11 retry loop.
+  elicit_input: Callable[[dict], dict] = lambda _p: {}
+  #: Borrow the client's model (§11/§21 sampling, Deprecated).
+  create_message: Callable[[dict], dict] = lambda _p: {}
+  #: Request the client's workspace roots (§11/§21 roots, Deprecated).
+  list_roots: Callable[[], dict] = lambda: {}
+  #: Broadcast a change notification to all matching subscription streams (§10.5/§10.6).
+  notify_subscribers: Callable[[dict], None] = lambda _n: None
+  #: Emit ``notifications/tools/list_changed`` on this request's stream (§16.9).
+  send_tool_list_changed: Callable[[], None] = lambda: None
+  #: Emit ``notifications/prompts/list_changed`` on this request's stream (§18.6).
+  send_prompt_list_changed: Callable[[], None] = lambda: None
+  #: Emit ``notifications/resources/list_changed`` on this request's stream (§17.7).
+  send_resource_list_changed: Callable[[], None] = lambda: None
+  #: Emit ``notifications/resources/updated`` on this request's stream (§17.7).
+  send_resource_updated: Callable[[dict], None] = lambda _p: None
 
 
 # ── Internal registration records ─────────────────────────────────────────────
@@ -154,6 +258,24 @@ class McpServer:
     self._cache_ttl_ms = cache_ttl_ms
     self._cache_scope = cache_scope
     self._validate = value_validator or _permissive_validator
+    self._task_store: object | None = None
+    self._task_notifier: Callable[[dict], None] | None = None
+
+  # ── tasks wiring (§25) ──
+  def set_task_store(self, store: object) -> None:
+    """Attach the Tasks-extension store; wires its update listener → ``notifications/tasks``."""
+    self._task_store = store
+    setter = getattr(store, "set_update_listener", None)
+    if callable(setter):
+      setter(self._on_task_update)
+
+  def set_task_notifier(self, notify: Callable[[dict], None]) -> None:
+    """Wire the subscription fan-out used to deliver ``notifications/tasks`` pushes (§25.10)."""
+    self._task_notifier = notify
+
+  def _on_task_update(self, task: dict) -> None:
+    if self._task_notifier is not None:
+      self._task_notifier({"method": "notifications/tasks", "params": task})
 
   # ── registration ──
   def register_tool(
@@ -245,6 +367,8 @@ class McpServer:
 
     :raises ServerError: for protocol-level failures (method-not-found, invalid params).
     """
+    if method == "initialize":
+      return self._initialize(params)
     if method == "ping":
       return {}
     if method == "logging/setLevel":
@@ -278,7 +402,47 @@ class McpServer:
     if method == "completion/complete":
       self._require_capability("completions", method)
       return self._complete(params)
+    if method == "tasks/get":
+      # §25.7: a GetTaskResult is the DetailedTask (with inline outcome) + resultType.
+      return self._task_op(method, params, lambda store, tid: self._as_complete(store.get_detailed(tid)))
+    if method == "tasks/cancel":
+      return self._task_op(method, params, lambda store, tid: self._cancel_task(store, tid))
+    if method == "tasks/update":
+      # §25.8: supply input to an input_required task, then return its DetailedTask.
+      return self._task_op(method, params, lambda store, tid: self._update_task(store, tid, params))
     raise ServerError(METHOD_NOT_FOUND_CODE, f"Method not found: {method}")
+
+  def _initialize(self, params: dict) -> dict:
+    """Legacy ``initialize`` handshake (back-compat probe). Echoes the requested revision so
+    any client accepts it; the server itself targets ``CURRENT_PROTOCOL_VERSION`` (§9.12).
+    """
+    requested = params.get("protocolVersion")
+    return {
+      "protocolVersion": requested if isinstance(requested, str) else CURRENT_PROTOCOL_VERSION,
+      "capabilities": self.capabilities,
+      "serverInfo": self.info,
+    }
+
+  def _task_op(self, method: str, params: dict, op: Callable[[object, str], dict]) -> dict:
+    """Run a Tasks operation, enforcing capability (§25.2) and a valid ``taskId`` (§25.7)."""
+    if self._task_store is None:
+      raise ServerError(
+        TASK_MISSING_CAPABILITY_CODE,
+        f"Tasks extension not supported (required for {method})",
+        build_tasks_missing_capability_error(method)["data"],
+      )
+    task_id = params.get("taskId")
+    if not isinstance(task_id, str):
+      raise ServerError(INVALID_PARAMS_CODE, "taskId (string) is required")
+    return op(self._task_store, task_id)
+
+  def _cancel_task(self, store: object, task_id: str) -> dict:
+    store.cancel(task_id)
+    return self._as_complete(store.get_detailed(task_id))
+
+  def _update_task(self, store: object, task_id: str, params: dict) -> dict:
+    store.apply_input(task_id, params.get("inputResponses") or {})
+    return self._as_complete(store.get_detailed(task_id))
 
   def _discover(self) -> dict:
     return build_discover_result(
@@ -336,7 +500,21 @@ class McpServer:
         raise ServerError(INVALID_PARAMS_CODE, f"Invalid arguments for {name}: {'; '.join(errors)}")
 
     task_param = params.get("task")
-    result = tool.handler(_apply_defaults(args, tool.input_schema), self._tool_context(ctx, task_param))
+
+    # §11 multi-round-trip: a tool solicits client input (elicitation/sampling/roots) by
+    # returning an input_required result resolved by client RETRY — never a server-initiated
+    # request. The collector replays responses the client already supplied (echoed
+    # requestState plus this round's inputResponses); the first unanswered solicitation
+    # raises InputRequired, which we convert into the input_required result to retry against.
+    input_responses = params.get("inputResponses") or {}
+    prior = _decode_request_state(params["requestState"]) if isinstance(params.get("requestState"), str) else {}
+    accumulated = {**prior, **input_responses}
+    collector = _InputCollector(accumulated)
+
+    try:
+      result = tool.handler(_apply_defaults(args, tool.input_schema), self._tool_context(ctx, task_param, collector))
+    except InputRequired as needed:
+      return build_input_required_result({needed.key: needed.request}, _encode_request_state(accumulated))
 
     # Validate declared outputSchema against returned structuredContent (§16.5/§16.6).
     if (
@@ -357,11 +535,15 @@ class McpServer:
       return {"resultType": TASK_RESULT_TYPE, **result["task"]}
     return self._as_complete(result)
 
-  def _tool_context(self, ctx: ServerRequestContext, task_param: dict | None) -> ToolContext:
+  def _tool_context(
+    self, ctx: ServerRequestContext, task_param: dict | None, collector: _InputCollector | None = None
+  ) -> ToolContext:
     progress_token = ctx.meta.get("progressToken")
     server = self
+    collect = collector or _InputCollector({})
 
     def _log(level: str, message: str) -> None:
+      # §15.3: only emit a log at or above the server's current minimum level.
       if LOG_LEVELS.index(level) < LOG_LEVELS.index(server._log_level):
         return
       ctx.notify(
@@ -375,6 +557,18 @@ class McpServer:
       task_ttl_ms=(task_param or {}).get("ttl"),
       notify=ctx.notify,
       log=_log,
+      signal=ctx.signal,
+      auth_info=ctx.auth_info,
+      # §11: solicit client input via the input_required + retry mechanism (NOT a
+      # server-initiated request); each returns the supplied response or raises InputRequired.
+      elicit_input=lambda p: collect.solicit("elicitation/create", p),
+      create_message=lambda p: collect.solicit("sampling/createMessage", p),
+      list_roots=lambda: collect.solicit("roots/list", {}),
+      notify_subscribers=ctx.notify_subscribers,
+      send_tool_list_changed=lambda: ctx.notify({"method": "notifications/tools/list_changed"}),
+      send_prompt_list_changed=lambda: ctx.notify({"method": "notifications/prompts/list_changed"}),
+      send_resource_list_changed=lambda: ctx.notify({"method": "notifications/resources/list_changed"}),
+      send_resource_updated=lambda p: ctx.notify({"method": "notifications/resources/updated", "params": p}),
     )
 
   # ── resources ──
