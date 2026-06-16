@@ -107,10 +107,10 @@ export function isTaskLifecycleMethod(method: string): method is TaskLifecycleMe
  * removed: `-32602` (Invalid params). (§25.7, §25.11, R-25.7-r, R-25.8-m,
  * R-25.9-g, R-25.11-d)
  *
- * NOTE: distinct from S39's {@link import('./tasks.js').TASK_NOT_FOUND_CODE}
- * (`-32002`, the §22 not-found literal used by §25.4/§25.6). The S40 wire
- * operations specify `-32602` precisely, so this reuses the core
- * {@link INVALID_PARAMS_CODE} (S05) rather than the not-found literal.
+ * NOTE: S39's {@link import('./tasks.js').TASK_NOT_FOUND_CODE} resolves to the
+ * SAME core `-32602` (Invalid params) — both the §25.4/§25.6 not-found condition
+ * and these S40 wire operations specify `-32602`. The legacy `-32002` literal is
+ * NOT minted by this SDK; this reuses {@link INVALID_PARAMS_CODE} (S05) accordingly.
  */
 export const TASK_INVALID_PARAMS_CODE = INVALID_PARAMS_CODE;
 

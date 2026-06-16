@@ -48,7 +48,6 @@ import {
   hasExternalRef,
   schemaNestingDepth,
   DEFAULT_SCHEMA_LIMITS,
-  type SchemaLimits,
 } from './tools.js';
 import {
   mayTrustToolAnnotations,
@@ -74,7 +73,7 @@ import {
   type ToolsCallMediationInput,
   type ToolsCallMediationDecision,
 } from './ui-host.js';
-import { buildInvalidCursorError, INVALID_CURSOR_CODE } from './pagination.js';
+import { buildInvalidCursorError } from './pagination.js';
 
 // ─── §28 requirement registry ───────────────────────────────────────────────────
 
@@ -1574,7 +1573,7 @@ export type FilePathValidation =
  * @param authorizedRoot - The absolute root directory the user has authorized. (R-28.10-p)
  */
 export function sanitizeFilePath(requestedPath: string, authorizedRoot: string): FilePathValidation {
-  if (requestedPath.includes(' ')) {
+  if (requestedPath.includes('\x00')) {
     return { ok: false, reason: 'file path MUST NOT contain a NUL byte (R-28.10-o)' };
   }
   const root = normalizePosix(authorizedRoot);

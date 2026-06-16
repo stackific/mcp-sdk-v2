@@ -39,6 +39,13 @@ describe('isJSONValue — all six wire forms (AC-02.1 — R-2.3-a)', () => {
   it('rejects undefined', () => expect(isJSONValue(undefined)).toBe(false));
   it('rejects a function', () => expect(isJSONValue(() => {})).toBe(false));
   it('rejects a Symbol', () => expect(isJSONValue(Symbol())).toBe(false));
+  it('rejects NaN / ±Infinity — not representable in JSON (R-2.3-a)', () => {
+    expect(isJSONValue(NaN)).toBe(false);
+    expect(isJSONValue(Infinity)).toBe(false);
+    expect(isJSONValue(-Infinity)).toBe(false);
+    // …and nested, so a structure carrying a non-finite number is not a JSONValue.
+    expect(isJSONValue({ a: [1, NaN] })).toBe(false);
+  });
 });
 
 describe('lastDuplicateWins — duplicate-key handling (AC-02.3 — R-2.3.1-c)', () => {

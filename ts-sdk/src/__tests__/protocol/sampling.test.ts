@@ -9,7 +9,6 @@ import {
   SAMPLING_METHOD,
   SAMPLING_REPLACEMENT_GUIDANCE,
   isSamplingDeprecated,
-  ToolUseContentSchema,
   ToolResultContentSchema,
   isToolUseContent,
   isToolResultContent,

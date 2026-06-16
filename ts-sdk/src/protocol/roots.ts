@@ -40,7 +40,6 @@ import { z } from 'zod';
 
 import {
   RootsListInputRequestSchema,
-  ListRootsResultSchema,
 } from './multi-round-trip.js';
 import {
   mayInvokeRootsList,
@@ -309,7 +308,7 @@ export function isPathTraversalSafe(uri: unknown): boolean {
   if (firstSlash === -1) return true; // no path portion (e.g. `file://host`)
   const rawPath = afterScheme.slice(firstSlash);
   for (const segment of rawPath.split('/')) {
-    let decoded = segment;
+    let decoded: string;
     try {
       decoded = decodeURIComponent(segment);
     } catch {

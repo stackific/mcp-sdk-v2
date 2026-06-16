@@ -36,6 +36,7 @@ import {
   type HttpValidation,
 } from '../transport/http/headers.js';
 import { validateRequestMeta, CLIENT_CAPABILITIES_META_KEY } from '../protocol/meta.js';
+import { validateParamHeaders } from '../transport/http/param-headers.js';
 import { isTasksActiveForRequest, buildTasksMissingCapabilityError } from '../protocol/tasks.js';
 import { taskSubscriptionRequiresCapability } from '../protocol/tasks-lifecycle.js';
 import { CURRENT_PROTOCOL_VERSION } from '../protocol/discovery.js';
@@ -79,6 +80,12 @@ export interface McpRequestHandlerOptions {
 
 /**
  * Builds a Web `fetch` handler that serves `server` over Streamable HTTP.
+ *
+ * Scope (S15): this is an **endpoint** server handler, not an intermediary or a
+ * multi-host gateway. The §9 Recommended behaviors for intermediaries — version-
+ * trust propagation and dual-hosting/multi-host guidance (RC-4/RC-5/RC-10/RC-11) —
+ * do not apply to an endpoint and are intentionally out of scope here; an embedder
+ * that fronts this handler with a proxy owns those intermediary obligations.
  *
  * @example
  * ```ts
@@ -188,6 +195,7 @@ export function createMcpRequestHandler(
   const validateRequestEnvelope = (
     headers: HttpHeaders,
     body: unknown,
+    params: Record<string, unknown>,
     meta: Record<string, unknown>,
     method: string,
     id: string | number | null,
@@ -205,6 +213,20 @@ export function createMcpRequestHandler(
     if (method !== 'initialize') {
       const m = validateRequestMeta(meta);
       if (!m.ok) return rejectRequest(id, { code: m.code, message: m.message });
+    }
+    // §9.5.4 (S14-RQ-29/34) / §9.8-d (S15-RQ-10): for a `tools/call`, the request's
+    // `Mcp-Param-*` headers MUST match the body. Resolve the registered tool's
+    // inputSchema and validate the headers against `params.arguments`; a forged,
+    // missing, or invalid-character header is rejected with -32001 (HTTP 400). The
+    // receiver-side check (`validateParamHeaders`) is wired here so the runtime —
+    // not just the library — enforces the §9.5 MUSTs.
+    if (method === 'tools/call' && typeof params['name'] === 'string') {
+      const schema = server.toolInputSchema(params['name']);
+      if (schema !== undefined) {
+        const args = (params['arguments'] ?? {}) as Record<string, unknown>;
+        const headerCheck = validateParamHeaders(schema, args, headers);
+        if (!headerCheck.ok) return rejectRequest(id, headerCheck.rejection.error);
+      }
     }
     return null;
   };
@@ -291,7 +313,7 @@ export function createMcpRequestHandler(
 
     // §9.3–§9.4 + §4.3: validate the required headers, routing headers, and the
     // per-request `_meta` envelope before dispatch; reject with the §9.7 status.
-    const rejection = validateRequestEnvelope(reqHeaders, parsed, meta, requestMsg.method, requestMsg.id);
+    const rejection = validateRequestEnvelope(reqHeaders, parsed, params, meta, requestMsg.method, requestMsg.id);
     if (rejection) return rejection;
 
     // The negotiated revision is taken from the (now-validated) header.

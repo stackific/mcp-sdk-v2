@@ -104,9 +104,12 @@ export function isJSONValue(value: unknown): value is JSONValue {
   if (value === null) return true;
   switch (typeof value) {
     case 'string':
-    case 'number':
     case 'boolean':
       return true;
+    case 'number':
+      // NaN and ±Infinity are not representable in JSON and are NOT JSONValues —
+      // `JSON.stringify` emits them as `null`, so they can never round-trip. (R-2.3-a)
+      return Number.isFinite(value);
     case 'object':
       if (Array.isArray(value)) {
         return value.every(isJSONValue);

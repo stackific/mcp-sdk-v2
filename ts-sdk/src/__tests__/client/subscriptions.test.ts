@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { McpServer } from '../../server/server.js';
 import { InMemoryTaskStore } from '../../server/tasks.js';
 import { createMcpRequestHandler } from '../../server/streamable-http.js';
-import { Client, RequestError } from '../../client/client.js';
+import { Client } from '../../client/client.js';
 import { StreamableHTTPClientTransport } from '../../client/streamable-http.js';
 import { TASKS_EXTENSION_ID } from '../../protocol/tasks.js';
 import { buildPostHeaders } from '../../transport/http/headers.js';

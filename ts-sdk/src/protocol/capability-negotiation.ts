@@ -34,7 +34,6 @@ import {
   buildMissingCapabilityError,
   MISSING_CLIENT_CAPABILITY_CODE,
   INVALID_PARAMS_CODE,
-  validateRequestMeta,
 } from './meta.js';
 
 export {

@@ -3,6 +3,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { McpServer, InMemoryTaskStore, ServerError } from '../../server/index.js';
+import { TASKS_EXTENSION_ID } from '../../protocol/tasks.js';
+import { CLIENT_CAPABILITIES_META_KEY } from '../../protocol/meta.js';
 
 const noStreamCtx = {
   protocolVersion: '2026-07-28',
@@ -11,6 +13,12 @@ const noStreamCtx = {
   signal: new AbortController().signal,
   notify() {},
   serverRequest: async () => ({}),
+};
+
+/** A context whose per-request client capabilities negotiate the Tasks extension (§25.2). */
+const tasksCtx = {
+  ...noStreamCtx,
+  meta: { [CLIENT_CAPABILITIES_META_KEY]: { extensions: { [TASKS_EXTENSION_ID]: {} } } },
 };
 
 describe('S4 — InMemoryTaskStore (§25)', () => {
@@ -78,26 +86,47 @@ describe('C8 — Tasks dispatch (§25.3 / §25.7 / §25.8)', () => {
     return { server, store };
   }
 
-  it('a task-augmented tools/call returns a CreateTaskResult (resultType:"task", flattened)', async () => {
+  it('a task-augmented tools/call returns a CreateTaskResult ONLY when the client negotiated Tasks (§25.2)', async () => {
     const { server } = taskServer();
-    const r = await server.dispatch('tools/call', { name: 'job', task: { ttl: 60000 } }, noStreamCtx);
+    // Client declared `io.modelcontextprotocol/tasks` AND server advertises it → handle.
+    const r = await server.dispatch('tools/call', { name: 'job', task: { ttl: 60000 } }, tasksCtx);
     expect(r.resultType).toBe('task');
     expect(typeof r.taskId).toBe('string');
     expect(r.task).toBeUndefined(); // flattened, not nested under `task`
   });
 
+  it('does NOT return a task handle to a client that did not negotiate Tasks (S39, R-25.2-d)', async () => {
+    const { server } = taskServer();
+    // `noStreamCtx` declares no client capabilities → the server MUST NOT substitute a
+    // task handle; it returns the ordinary `complete` result with no taskId.
+    const r = await server.dispatch('tools/call', { name: 'job', task: { ttl: 60000 } }, noStreamCtx);
+    expect(r.resultType).toBe('complete');
+    expect(r.taskId).toBeUndefined();
+    expect(r.task).toBeUndefined();
+  });
+
   it('tasks/get returns a DetailedTask (resultType:"complete") with the inline result (§25.7)', async () => {
     const { server } = taskServer();
-    const created = await server.dispatch('tools/call', { name: 'job', task: { ttl: 60000 } }, noStreamCtx);
-    const got = await server.dispatch('tasks/get', { taskId: created.taskId }, noStreamCtx);
+    const created = await server.dispatch('tools/call', { name: 'job', task: { ttl: 60000 } }, tasksCtx);
+    const got = await server.dispatch('tasks/get', { taskId: created.taskId }, tasksCtx);
     expect(got.resultType).toBe('complete');
     expect(got.status).toBe('completed');
     expect((got.result as any).content[0].text).toBe('done');
   });
 
+  it('rejects tasks/get from a client that did not negotiate Tasks with -32003 (S40, §25.7-c)', async () => {
+    const { server } = taskServer(); // store present, server advertises Tasks
+    // First create a task via a negotiated client so a real id exists…
+    const created = await server.dispatch('tools/call', { name: 'job', task: { ttl: 60000 } }, tasksCtx);
+    // …then query it from a client that did NOT declare the extension → -32003.
+    await expect(
+      server.dispatch('tasks/get', { taskId: created.taskId }, noStreamCtx),
+    ).rejects.toMatchObject({ code: -32003 });
+  });
+
   it('missing Tasks capability/store → -32003, not -32601 (§25.7)', async () => {
     const server = new McpServer({ name: 's', version: '1' }, { tools: {} }); // no task store
-    await expect(server.dispatch('tasks/get', { taskId: 'x' }, noStreamCtx)).rejects.toMatchObject({ code: -32003 });
+    await expect(server.dispatch('tasks/get', { taskId: 'x' }, tasksCtx)).rejects.toMatchObject({ code: -32003 });
   });
 
   it('the non-spec tasks/result and tasks/list are no longer dispatched (-32601)', async () => {
@@ -138,6 +167,15 @@ describe('S1 — McpServer pagination (§12)', () => {
   it('omits nextCursor when everything fits in one page', async () => {
     const server = serverWithTools(3, 50);
     const r = await server.dispatch('tools/list', {}, noStreamCtx);
+    expect((r.tools as any[]).length).toBe(3);
+    expect(r.nextCursor).toBeUndefined();
+  });
+
+  it('treats a received cursor:"" as a present cursor (offset 0), not "no cursor" (S18 server role, §12.3)', async () => {
+    const server = serverWithTools(3, 50);
+    // The gate is on PRESENCE, not truthiness: `cursor:""` decodes to offset 0 and the
+    // page is returned, rather than the cursor being silently ignored or rejected.
+    const r = await server.dispatch('tools/list', { cursor: '' }, noStreamCtx);
     expect((r.tools as any[]).length).toBe(3);
     expect(r.nextCursor).toBeUndefined();
   });

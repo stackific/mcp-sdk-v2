@@ -16,8 +16,10 @@
 import type { AuthProvider } from './streamable-http.js';
 import {
   AuthorizationServerMetadataSchema,
+  authorizationServerWellKnownUris,
   type AuthorizationServerMetadata,
 } from '../protocol/authorization.js';
+import { validateIssuer, verifyRedirectState } from '../protocol/authorization-flow.js';
 
 const PKCE_METHOD = 'S256' as const;
 
@@ -78,9 +80,11 @@ export async function discoverOAuthMetadata(options: {
   const issuer = prm.authorization_servers?.[0];
   if (!issuer) throw new Error('protected-resource metadata lists no authorization_servers');
 
-  // RFC 8414 + OIDC discovery, path-aware: try the OAuth well-known (host-inserted),
-  // then OIDC (path-appended), with root fallbacks for path-component issuers. (§23.17)
-  const asJson = await fetchFirstJson(fetchImpl, discoveryUrls(issuer));
+  // RFC 8414 + OIDC discovery in the exact §23.3 priority order (R-23.3-b/c): OAuth
+  // AS Metadata path-insertion, OIDC path-insertion, OIDC path-appending, with the
+  // root fallbacks for a path-less issuer. Reuses the reference URI builder so the
+  // wired client and the protocol model agree on discovery ordering (S35-RQ-18).
+  const asJson = await fetchFirstJson(fetchImpl, authorizationServerWellKnownUris(issuer));
   const authorizationServer = AuthorizationServerMetadataSchema.parse(asJson);
 
   // Mix-up defense (§23.3, RFC 8414 §3.3): the metadata `issuer` MUST identify the
@@ -93,12 +97,6 @@ export async function discoverOAuthMetadata(options: {
   return { protectedResource: prm, authorizationServer, issuer };
 }
 
-/**
- * The ordered authorization-server metadata URLs to try for `issuer`, path-aware
- * per RFC 8414 §3.1 / OIDC Discovery (§23.17): the OAuth well-known is inserted
- * between host and path; the OIDC one is appended to the issuer. For a path-component
- * issuer, root-level fallbacks are also tried.
- */
 /** Protected-resource metadata URLs for `resource`, path-aware (RFC 9728 §3.1) + root fallback. */
 function protectedResourceMetadataUrls(resource: string): string[] {
   const u = new URL(resource);
@@ -109,27 +107,17 @@ function protectedResourceMetadataUrls(resource: string): string[] {
   return urls;
 }
 
-function discoveryUrls(issuer: string): string[] {
-  const u = new URL(issuer);
-  const host = `${u.protocol}//${u.host}`;
-  const path = u.pathname.replace(/\/+$/, ''); // '' for a root issuer
-  const trimmedIssuer = issuer.replace(/\/+$/, '');
-  const urls = [
-    `${host}/.well-known/oauth-authorization-server${path}`,
-    `${trimmedIssuer}/.well-known/openid-configuration`,
-  ];
-  if (path) {
-    urls.push(`${host}/.well-known/oauth-authorization-server`, `${host}/.well-known/openid-configuration`);
-  }
-  return urls;
-}
-
 /**
  * Verifies the authorization redirect before redeeming the code (§23.5 / §23.7):
- * the returned `state` MUST equal the value sent in step 1 (CSRF defense), and when
- * the AS advertises `authorization_response_iss_parameter_supported`, the returned
- * `iss` MUST exactly equal the issuer (mix-up defense). Throws on any mismatch.
- * Edge-safe (pure string comparison).
+ * the returned `state` MUST equal the value sent in step 1 (CSRF defense), and the
+ * returned `iss` MUST be validated against the recorded issuer per the §23.7
+ * decision table. Crucially, a PRESENT `iss` is compared by EXACT string match
+ * EVEN WHEN the AS does not advertise `authorization_response_iss_parameter_supported`
+ * (R-23.7-f) — the mix-up defense the wired client previously skipped when the flag
+ * was false/absent. Throws on any mismatch. Edge-safe (pure string comparison).
+ *
+ * Delegates to the reference `verifyRedirectState` / `validateIssuer` so the wired
+ * OAuth client and the protocol model enforce identical rules.
  */
 export function verifyAuthorizationRedirect(options: {
   sentState: string;
@@ -138,16 +126,19 @@ export function verifyAuthorizationRedirect(options: {
   returnedIss?: string | null;
   issParameterSupported?: boolean;
 }): void {
-  if (options.sentState !== (options.returnedState ?? undefined)) {
-    throw new Error('OAuth redirect `state` mismatch — possible CSRF; refusing to redeem the code (§23.5)');
+  const stateCheck = verifyRedirectState(options.sentState, options.returnedState ?? undefined);
+  if (!stateCheck.ok) {
+    throw new Error(`OAuth redirect \`state\` mismatch — possible CSRF; refusing to redeem the code (§23.5): ${stateCheck.reason}`);
   }
-  if (options.issParameterSupported) {
-    if (options.returnedIss === undefined || options.returnedIss === null) {
-      throw new Error('AS advertises the iss parameter but the redirect carried no `iss` (§23.7)');
-    }
-    if (options.returnedIss !== options.issuer) {
-      throw new Error(`OAuth redirect \`iss\` "${options.returnedIss}" ≠ issuer "${options.issuer}" — possible mix-up (§23.7)`);
-    }
+  // §23.7 (R-23.7-d/e/f): a present `iss` is ALWAYS compared (exact match), regardless
+  // of the advertised flag; an advertised-but-absent `iss` is rejected.
+  const issCheck = validateIssuer({
+    iss: options.returnedIss ?? undefined,
+    recordedIssuer: options.issuer,
+    issParameterSupported: options.issParameterSupported,
+  });
+  if (!issCheck.ok) {
+    throw new Error(`OAuth redirect \`iss\` validation failed — possible mix-up (§23.7): ${issCheck.reason}`);
   }
 }
 

@@ -7,8 +7,9 @@
  * methods carry top-level `ttlMs` + `cacheScope` (§13.4). Before C1/C2 the live
  * server emitted neither, so these results would have failed their own schemas.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { McpServer, ServerError, type RequestContext, type McpServerOptions } from '../../server/server.js';
+import { CLIENT_CAPABILITIES_META_KEY } from '../../protocol/meta.js';
 import { ListToolsResultSchema } from '../../protocol/tools.js';
 import { CallToolResultSchema } from '../../protocol/tools-call.js';
 import { ListResourcesResultSchema, ListResourceTemplatesResultSchema } from '../../protocol/resources.js';
@@ -167,9 +168,16 @@ describe('runtime wire conformance — results validate against their schemas', 
       const r = await c.elicitInput({ mode: 'form', message: 'hi' });
       return { content: [{ type: 'text', text: String((r as any).action) }] };
     });
+    // The client must have DECLARED the elicitation capability for this request — the
+    // server gates the solicited kind against the per-request client capabilities
+    // (§11.2-j / §11.5-g). (Without it the call is rejected with -32003, asserted below.)
+    const elicitCtx: RequestContext = {
+      ...ctx,
+      meta: { [CLIENT_CAPABILITIES_META_KEY]: { elicitation: {} } },
+    };
     // First call → input_required carrying an elicitation inputRequest + a requestState
     // (NOT a server-initiated JSON-RPC request).
-    const r1 = await server.dispatch('tools/call', { name: 'ask', arguments: {} }, ctx);
+    const r1 = await server.dispatch('tools/call', { name: 'ask', arguments: {} }, elicitCtx);
     expect(r1.resultType).toBe('input_required');
     const reqs = r1.inputRequests as Record<string, any>;
     const key = Object.keys(reqs)[0]!;
@@ -180,10 +188,83 @@ describe('runtime wire conformance — results validate against their schemas', 
     const r2 = await server.dispatch(
       'tools/call',
       { name: 'ask', arguments: {}, inputResponses: { [key]: { action: 'accept' } }, requestState: r1.requestState },
-      ctx,
+      elicitCtx,
     );
     expect(r2.resultType).toBe('complete');
     expect((r2.content as any[])[0].text).toBe('accept');
+  });
+
+  it('rejects a solicited input-request kind the client did NOT declare with -32003 (§11.5-g / S30–S33)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {}, elicitation: {} });
+    server.registerTool('ask', {}, async (_a, c) => {
+      await c.elicitInput({ mode: 'form', message: 'hi' });
+      return { content: [] };
+    });
+    // The shared `ctx` declares NO client capabilities → the server MUST NOT emit the
+    // `elicitation/create` kind; it rejects with -32003 instead of soliciting.
+    await expect(server.dispatch('tools/call', { name: 'ask', arguments: {} }, ctx)).rejects.toMatchObject({ code: -32003 });
+  });
+
+  it('rejects a tampered requestState continuation token with -32602 (§28.6, R-28.6-b)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {}, elicitation: {} });
+    server.registerTool('ask', {}, async (_a, c) => {
+      const r = await c.elicitInput({ mode: 'form' });
+      return { content: [{ type: 'text', text: String((r as any).action) }] };
+    });
+    const elicitCtx: RequestContext = { ...ctx, meta: { [CLIENT_CAPABILITIES_META_KEY]: { elicitation: {} } } };
+    const r1 = await server.dispatch('tools/call', { name: 'ask', arguments: {} }, elicitCtx);
+    const key = Object.keys(r1.inputRequests as Record<string, any>)[0]!;
+    // Flip the first ciphertext character → AES-GCM authentication fails → -32602.
+    const token = r1.requestState as string;
+    const dot = token.indexOf('.');
+    const ctChar = token[dot + 1];
+    const tampered = token.slice(0, dot + 1) + (ctChar === 'A' ? 'B' : 'A') + token.slice(dot + 2);
+    await expect(
+      server.dispatch(
+        'tools/call',
+        { name: 'ask', arguments: {}, inputResponses: { [key]: { action: 'accept' } }, requestState: tampered },
+        elicitCtx,
+      ),
+    ).rejects.toMatchObject({ code: -32602, data: { reason: 'integrity-validation-failed' } });
+    // A forged/garbage token is likewise rejected, not silently treated as empty state.
+    await expect(
+      server.dispatch('tools/call', { name: 'ask', arguments: {}, requestState: 'not-a-real-token' }, elicitCtx),
+    ).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it('refuses a url-mode elicitation to a form-only client, allows it once url is declared (S30, R-20.1-d)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {}, elicitation: {} });
+    server.registerTool('ask', {}, async (_a, c) => {
+      await c.elicitInput({ mode: 'url', url: 'https://example.test/form' });
+      return { content: [] };
+    });
+    // Form-only client (`elicitation: {}` ⇒ form only) → a url-mode solicit is REFUSED, not emitted.
+    const formOnly: RequestContext = { ...ctx, meta: { [CLIENT_CAPABILITIES_META_KEY]: { elicitation: {} } } };
+    await expect(server.dispatch('tools/call', { name: 'ask', arguments: {} }, formOnly)).rejects.toMatchObject({ code: -32003 });
+    // A client that declared the `elicitation.url` sub-flag gets the input_required (emitted).
+    const urlCap: RequestContext = { ...ctx, meta: { [CLIENT_CAPABILITIES_META_KEY]: { elicitation: { url: {} } } } };
+    const r = await server.dispatch('tools/call', { name: 'ask', arguments: {} }, urlCap);
+    expect(r.resultType).toBe('input_required');
+  });
+
+  it('refuses a tool-enabled sampling/createMessage without sampling.tools, allows it with (S33, R-21.2.3-a)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {} });
+    server.registerTool('ask', {}, async (_a, c) => {
+      await c.createMessage({ messages: [], tools: [{ name: 't', inputSchema: { type: 'object' } }] });
+      return { content: [] };
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      // `sampling: {}` declares sampling but NOT the tools sub-flag → tool-enabled request is refused.
+      const noTools: RequestContext = { ...ctx, meta: { [CLIENT_CAPABILITIES_META_KEY]: { sampling: {} } } };
+      await expect(server.dispatch('tools/call', { name: 'ask', arguments: {} }, noTools)).rejects.toMatchObject({ code: -32602 });
+      // `sampling: { tools: {} }` declares the sub-flag → the request is emitted.
+      const withTools: RequestContext = { ...ctx, meta: { [CLIENT_CAPABILITIES_META_KEY]: { sampling: { tools: {} } } } };
+      const r = await server.dispatch('tools/call', { name: 'ask', arguments: {} }, withTools);
+      expect(r.resultType).toBe('input_required');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('rejects a missing required prompt arg and unknown completion refs with -32602 (M3)', async () => {
@@ -204,6 +285,57 @@ describe('runtime wire conformance — results validate against their schemas', 
       ctx,
     );
     expect((ok.completion as any).values).toEqual(['english']);
+  });
+
+  it('publishes a tool _meta (e.g. _meta.ui) on its tools/list entry (S41/S42)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {} });
+    server.registerTool('widget', { _meta: { ui: { resourceUri: 'ui://widget' } } }, async () => ({ content: [] }));
+    const r = await server.dispatch('tools/list', {}, ctx);
+    const entry = (r.tools as any[]).find((t) => t.name === 'widget');
+    expect(entry._meta).toEqual({ ui: { resourceUri: 'ui://widget' } });
+  });
+
+  it('emits an out-of-band deprecation warning when a tool solicits a Deprecated kind (RC-7, §27.4)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {} });
+    server.registerTool('legacy', {}, async (_a, c) => {
+      await c.createMessage({ messages: [] }); // sampling — a Deprecated capability
+      return { content: [] };
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const samplingCtx: RequestContext = { ...ctx, meta: { [CLIENT_CAPABILITIES_META_KEY]: { sampling: {} } } };
+      const r = await server.dispatch('tools/call', { name: 'legacy', arguments: {} }, samplingCtx);
+      expect(r.resultType).toBe('input_required'); // it solicited sampling
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Sampling capability'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('emits notifications/message ONLY for a request that opted in via _meta.logLevel (P0-6, §15.3.3)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {} });
+    server.registerTool('chatty', {}, async (_a, c) => {
+      c.log('info', 'hello');
+      c.log('debug', 'verbose');
+      return { content: [] };
+    });
+    const run = async (meta: Record<string, unknown>): Promise<number> => {
+      const notes: Array<{ method: string }> = [];
+      const c: RequestContext = { ...ctx, meta, notify: (n) => notes.push(n) };
+      await server.dispatch('tools/call', { name: 'chatty' }, c);
+      return notes.filter((n) => n.method === 'notifications/message').length;
+    };
+    // No opt-in → nothing is emitted (there is no global server log level anymore).
+    expect(await run({})).toBe(0);
+    // Opt-in at 'debug' → both the info and debug messages are emitted.
+    expect(await run({ 'io.modelcontextprotocol/logLevel': 'debug' })).toBe(2);
+    // Opt-in at 'error' → info/debug are below threshold and suppressed.
+    expect(await run({ 'io.modelcontextprotocol/logLevel': 'error' })).toBe(0);
+  });
+
+  it('no longer dispatches the removed logging/setLevel method (-32601, P0-6)', async () => {
+    const server = new McpServer({ name: 's', version: '1' }, { tools: {} });
+    await expect(server.dispatch('logging/setLevel', { level: 'debug' }, ctx)).rejects.toMatchObject({ code: -32601 });
   });
 
   it('a non-caching server still emits ttlMs:0 / private; options override the defaults', async () => {

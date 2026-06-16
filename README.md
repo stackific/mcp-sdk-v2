@@ -1,14 +1,14 @@
-# MCP V2 — Live Companion (multi-language, story-mapped)
+# MCP V2 SDK — with a full-featured demo (multi-language)
 
 A runnable companion to the **MCP V2 RC specification**. The shared frontend can be backed by any of
 several **language stacks** — pick one on the home page and it repoints at that stack's MCP **client
 host** (a different backend + server configuration on its own ports):
 
-| Stack          | Status        | MCP server         | Client host        | OAuth AS |
-| -------------- | ------------- | ------------------ | ------------------ | -------- |
-| **TypeScript** | ✅ full       | `ts-mcp-server` :8001 | `ts-mcp-client` :8002 | :8003    |
-| **Python**     | ✅ full       | `py-mcp-server` :8101 | `py-mcp-client` :8102 | :8103    |
-| **C#**         | ✅ full       | `csharp-mcp-server` :8201 | `csharp-mcp-client` :8202 | :8203 |
+| Stack          | Status        | MCP server         | Client host        | OAuth AS | Tests |
+| -------------- | ------------- | ------------------ | ------------------ | -------- | ----- |
+| **TypeScript** | ✅ full       | `ts-mcp-server` :8001 | `ts-mcp-client` :8002 | :8003    | 3,018 |
+| **Python**     | ✅ full       | `py-mcp-server` :8101 | `py-mcp-client` :8102 | :8103    | 4,913 |
+| **C#**         | ✅ full       | `csharp-mcp-server` :8201 | `csharp-mcp-client` :8202 | :8203 | 3,478 |
 
 The shared **frontend** runs on **:8000**. The **TypeScript**, **Python**, and **C#** stacks are all full
 implementations, each on its own from-the-spec SDK (`ts-sdk` / `py-sdk` / `csharp-sdk` `Stackific.Mcp`):

@@ -23,6 +23,7 @@ import {
   emitDeprecationWarning,
   findDeprecatedEntry,
 } from '../../lifecycle/registry.js';
+import { isEligibleForRemoval } from '../../lifecycle/policy.js';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -45,6 +46,20 @@ describe('DEPRECATED_REGISTRY structure (AC-43.21, AC-43.22, AC-43.23)', () => {
   it('every earliestRemoval is an ISO 8601 date (YYYY-MM-DD) (AC-43.23)', () => {
     for (const entry of DEPRECATED_REGISTRY) {
       expect(entry.earliestRemoval).toMatch(ISO_DATE_RE);
+    }
+  });
+
+  it('every entry carries a deprecatedSince and a §27.2-valid removal window', () => {
+    for (const entry of DEPRECATED_REGISTRY) {
+      expect(entry.deprecatedSince).toMatch(ISO_DATE_RE);
+      // §27.2: earliestRemoval MUST be ≥ deprecatedSince + 12 months — so the window
+      // rule is evaluable against the row. A date exactly 12 months out is eligible;
+      // the day before is not.
+      const since = new Date(`${entry.deprecatedSince}T00:00:00Z`);
+      const removal = new Date(`${entry.earliestRemoval}T00:00:00Z`);
+      expect(isEligibleForRemoval(since, removal)).toBe(true);
+      const dayBefore = new Date(removal.getTime() - 24 * 60 * 60 * 1000);
+      expect(isEligibleForRemoval(since, dayBefore)).toBe(false);
     }
   });
 });

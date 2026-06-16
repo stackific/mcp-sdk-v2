@@ -27,19 +27,25 @@ export const DEPRECATED_REGISTRY: ReadonlyArray<DeprecatedRegistryEntry> = [
     feature: 'Roots capability',
     definedIn: '§21',
     migrationNote: 'No direct replacement; roots integration is now host-managed.',
-    earliestRemoval: '2026-07-28',
+    deprecatedSince: '2026-07-28',
+    // §27.2: earliest removal is ≥ deprecatedSince + 12 months.
+    earliestRemoval: '2027-07-28',
   },
   {
     feature: 'Sampling capability',
     definedIn: '§21',
     migrationNote: 'No direct replacement; use Elicitation (§20) for structured user input.',
-    earliestRemoval: '2026-07-28',
+    deprecatedSince: '2026-07-28',
+    // §27.2: earliest removal is ≥ deprecatedSince + 12 months.
+    earliestRemoval: '2027-07-28',
   },
   {
     feature: 'includeContext values "thisServer" and "allServers"',
     definedIn: '§21',
     migrationNote: 'No replacement; context management is now host-managed.',
-    earliestRemoval: '2026-07-28',
+    deprecatedSince: '2026-07-28',
+    // §27.2: earliest removal is ≥ deprecatedSince + 12 months.
+    earliestRemoval: '2027-07-28',
   },
   {
     feature: 'Logging capability',
@@ -47,19 +53,25 @@ export const DEPRECATED_REGISTRY: ReadonlyArray<DeprecatedRegistryEntry> = [
     migrationNote:
       'For stdio (§8), write diagnostics to stderr; for general observability, ' +
       'emit telemetry via an external observability framework.',
-    earliestRemoval: '2026-07-28',
+    deprecatedSince: '2026-07-28',
+    // §27.2: earliest removal is ≥ deprecatedSince + 12 months.
+    earliestRemoval: '2027-07-28',
   },
   {
     feature: 'io.modelcontextprotocol/logLevel _meta key',
     definedIn: '§15',
     migrationNote: 'See Logging capability migration note.',
-    earliestRemoval: '2026-07-28',
+    deprecatedSince: '2026-07-28',
+    // §27.2: earliest removal is ≥ deprecatedSince + 12 months.
+    earliestRemoval: '2027-07-28',
   },
   {
     feature: 'Dynamic Client Registration',
     definedIn: '§23',
     migrationNote: 'Use static OAuth 2.0 client registration instead.',
-    earliestRemoval: '2026-07-28',
+    deprecatedSince: '2026-07-28',
+    // §27.2: earliest removal is ≥ deprecatedSince + 12 months.
+    earliestRemoval: '2027-07-28',
   },
 ];
 

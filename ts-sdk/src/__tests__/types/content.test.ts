@@ -376,6 +376,15 @@ describe('ContentBlockSchema — unknown type handling (AC-21.2 — R-14.4-b)', 
     expect(result.success).toBe(true);
   });
 
+  it('rejects a MALFORMED known-type block instead of passing it as unknown (R-14.4-b tightening)', () => {
+    // `{type:"text"}` is a known type missing its REQUIRED `text` — it must be
+    // rejected as malformed content, not accepted via the unknown-type fallback.
+    expect(ContentBlockSchema.safeParse({ type: 'text' }).success).toBe(false);
+    expect(ContentBlockSchema.safeParse({ type: 'image' }).success).toBe(false);
+    // A genuinely unknown type with no known schema is still accepted.
+    expect(ContentBlockSchema.safeParse({ type: 'future_thing' }).success).toBe(true);
+  });
+
   it('isKnownContentBlockType returns false for unknown types', () => {
     expect(isKnownContentBlockType('future_type')).toBe(false);
   });

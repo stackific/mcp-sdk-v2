@@ -186,10 +186,18 @@ export const ContentBlockSchema = z.union([
   AudioContentSchema,
   ResourceLinkSchema,
   EmbeddedResourceSchema,
-  // Forward-compat fallback: accept unknown types, but reject forbidden ones.
+  // Forward-compat fallback: accept GENUINELY unknown types only. A block whose
+  // `type` is a forbidden sampling discriminator is rejected (R-14.8-a/b); and a
+  // block whose `type` is a KNOWN type but which reached this fallback failed its
+  // own strict schema (e.g. `{type:"text"}` with no `text`), so it is malformed
+  // content — NOT "unknown" content — and is likewise rejected rather than passed
+  // through. (Tightens the §14.4-b forward-compatible fallback.)
   z.object({ type: z.string() }).passthrough().refine(
-    (b) => !isForbiddenContentBlockType((b as { type: string }).type),
-    { message: 'tool_use/tool_result MUST NOT appear where a ContentBlock is expected (R-14.8-a, R-14.8-b)' },
+    (b) => {
+      const type = (b as { type: string }).type;
+      return !isForbiddenContentBlockType(type) && !isKnownContentBlockType(type);
+    },
+    { message: 'invalid ContentBlock: a forbidden (tool_use/tool_result) or malformed known-type block (R-14.4-b, R-14.8-a, R-14.8-b)' },
   ),
 ]);
 

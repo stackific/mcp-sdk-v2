@@ -113,7 +113,15 @@ const TRACEPARENT_RE =
 
 /** Returns `true` when `value` conforms to the W3C `traceparent` format. */
 export function isValidTraceparent(value: string): boolean {
-  return TRACEPARENT_RE.test(value);
+  if (!TRACEPARENT_RE.test(value)) return false;
+  // W3C Trace Context validity beyond the byte grammar (R-2.6.2-i): version `ff`
+  // is reserved/forbidden, and neither the trace-id nor the parent-id may be
+  // all-zero (an all-zero id is the "invalid" sentinel, not a usable value).
+  const [version, traceId, parentId] = value.split('-');
+  if (version === 'ff') return false;
+  if (/^0+$/.test(traceId!)) return false;
+  if (/^0+$/.test(parentId!)) return false;
+  return true;
 }
 
 // ─── W3C tracestate grammar (Trace Context Level 2, §3.3) ────────────────────
