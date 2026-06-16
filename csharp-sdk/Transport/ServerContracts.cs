@@ -32,6 +32,39 @@ public interface IServerNotifier
   /// <param name="notification">The notification to deliver.</param>
   /// <returns>A task that completes when the notification has been handed to the transport.</returns>
   Task NotifyAsync(JsonRpcNotification notification);
+
+  /// <summary>
+  /// Issues a LIVE server-to-client request (for example <c>elicitation/create</c>,
+  /// <c>sampling/createMessage</c>, or <c>roots/list</c>) on the originating request's stream and
+  /// awaits the client's reply (spec §9.6.2, §7.2). The transport writes the request frame, commits the
+  /// response to a stream if it had not already, and correlates the client's separately-delivered
+  /// JSON-RPC <c>result</c>/<c>error</c> back to the returned task by id.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// This is distinct from the §11 <c>input_required</c> retry loop: that mechanism suspends the call and
+  /// resumes it on a fresh client request, whereas this keeps the handler running and round-trips to the
+  /// client mid-execution. A transport that cannot stream server-to-client requests (the single-response
+  /// <c>initialize</c> path, or a buffering bridge) MUST throw to signal it is unavailable rather than
+  /// hang. The default implementation throws, so transports opt in by overriding it.
+  /// </para>
+  /// <para>
+  /// The returned message is the raw correlated reply: a <see cref="JsonRpcSuccessResponse"/> carrying the
+  /// client's <c>result</c>, or a <see cref="JsonRpcErrorResponse"/> the caller surfaces as an
+  /// <see cref="McpError"/>.
+  /// </para>
+  /// </remarks>
+  /// <param name="method">The server-to-client request method name.</param>
+  /// <param name="parameters">The request params, or <c>null</c> for a params-less request (for example <c>roots/list</c>).</param>
+  /// <param name="cancellationToken">Cancels the wait (for example when the client closes the stream).</param>
+  /// <returns>The correlated client reply (a success or error response).</returns>
+  /// <exception cref="System.NotSupportedException">When the transport cannot issue a live server-to-client request.</exception>
+  Task<JsonRpcMessage> RequestAsync(
+    string method,
+    System.Text.Json.Nodes.JsonObject? parameters,
+    CancellationToken cancellationToken) =>
+    throw new NotSupportedException(
+      "This transport does not support live server-to-client requests; use the §11 input_required retry loop instead.");
 }
 
 /// <summary>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 using Stackific.Mcp.Json;
 using Stackific.Mcp.JsonRpc;
@@ -12,7 +13,7 @@ namespace Stackific.Mcp.Protocol;
 /// per-request capabilities, plus optional passthrough keys (progress token, trace context,
 /// third-party metadata). This is what enables the stateless model of §4.4.
 /// </summary>
-public sealed record RequestMeta
+public sealed partial record RequestMeta
 {
   /// <summary>REQUIRED. The protocol revision this request declares (§5.2).</summary>
   public required string ProtocolVersion { get; init; }
@@ -68,6 +69,17 @@ public sealed record RequestMeta
     }
 
     var protocolVersion = RequireString(meta, MetaKeys.ProtocolVersion);
+    // The value MUST be a revision identifier, i.e. a well-formed YYYY-MM-DD string (§5.1, R-5.2-b).
+    // A malformed-but-string version (for example "latest" or "2026/07/28") is rejected here at the
+    // request gate with -32602 (Invalid params) — distinct from a well-formed-but-unsupported revision,
+    // which the discovery/negotiation layer answers with -32004 (UnsupportedProtocolVersion).
+    if (!IsValidRevisionFormat(protocolVersion))
+    {
+      throw McpError.InvalidParams(
+        $"Required request metadata key \"{MetaKeys.ProtocolVersion}\" value \"{protocolVersion}\" " +
+        "is not a valid YYYY-MM-DD revision identifier (§5.1, R-5.2-b).");
+    }
+
     var clientInfo = RequireObject<Implementation>(meta, MetaKeys.ClientInfo);
     var clientCapabilities = RequireObject<ClientCapabilities>(meta, MetaKeys.ClientCapabilities);
 
@@ -123,4 +135,61 @@ public sealed record RequestMeta
       throw McpError.InvalidParams($"Request metadata key \"{key}\" is malformed: {error.Message}");
     }
   }
+
+  /// <summary>
+  /// Returns <c>true</c> when <paramref name="revision"/> matches the <c>YYYY-MM-DD</c> revision-format
+  /// (§5.1, R-5.2-b). Mirrors the TypeScript <c>isValidRevisionFormat</c> / <c>PROTOCOL_REVISION_FORMAT_RE</c>.
+  /// </summary>
+  /// <remarks>
+  /// A <c>true</c> result is a shape check only — it does NOT mean the revision is supported (use
+  /// <see cref="ProtocolRevision.IsSupported"/> for that). The regex validates only the digit/separator
+  /// layout, not calendar correctness, honoring the rule that revision identifiers are opaque,
+  /// exactly-matched strings never compared lexically, chronologically, or by range (R-5.1-a, R-5.1-b).
+  /// </remarks>
+  /// <param name="revision">The candidate revision identifier.</param>
+  /// <returns><c>true</c> when the value is a well-formed <c>YYYY-MM-DD</c> string.</returns>
+  public static bool IsValidRevisionFormat(string revision)
+  {
+    ArgumentNullException.ThrowIfNull(revision);
+    return RevisionFormatRegex().IsMatch(revision);
+  }
+
+  /// <summary>The anchored <c>YYYY-MM-DD</c> revision-format regex (§5.1), equivalent to TS <c>/^\d{4}-\d{2}-\d{2}$/</c>.</summary>
+  [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}$")]
+  private static partial Regex RevisionFormatRegex();
+}
+
+/// <summary>
+/// Severity-ordering helpers for the (existing) <see cref="LoggingLevel"/> enum (spec §4.3, R-4.3-m).
+/// The C# counterpart of the TypeScript <c>loggingLevelIndex</c> / <c>isAtOrAboveLogLevel</c> functions
+/// and the <c>LOGGING_LEVELS</c> ascending-severity ordering.
+/// </summary>
+/// <remarks>
+/// <see cref="LoggingLevel"/> is defined alongside the deprecated logging-message feature; its members
+/// are declared least-severe-first, so the enum's underlying integer value is its ascending-severity
+/// index. The deprecated <c>io.modelcontextprotocol/logLevel</c> <c>_meta</c> key opts a request in at a
+/// minimum severity: when present, a server SHOULD emit only log notifications at or above it; when
+/// absent, it MUST NOT emit log notifications for the request (R-4.3-l, R-4.3-m).
+/// </remarks>
+public static class LoggingLevelExtensions
+{
+  /// <summary>
+  /// Returns the numeric severity index of a <see cref="LoggingLevel"/> (lower = less severe), where
+  /// <see cref="LoggingLevel.Debug"/> is <c>0</c> and <see cref="LoggingLevel.Emergency"/> is <c>7</c>.
+  /// Mirrors the TypeScript <c>loggingLevelIndex</c>.
+  /// </summary>
+  /// <param name="level">The level to index.</param>
+  /// <returns>The zero-based ascending-severity index.</returns>
+  public static int Index(this LoggingLevel level) => (int)level;
+
+  /// <summary>
+  /// Returns <c>true</c> when <paramref name="candidate"/>'s severity is at or above
+  /// <paramref name="minimum"/> — implementing the server-side log-filtering rule R-4.3-m. Mirrors the
+  /// TypeScript <c>isAtOrAboveLogLevel</c>.
+  /// </summary>
+  /// <param name="candidate">The severity of the message being considered.</param>
+  /// <param name="minimum">The minimum severity requested for the originating request.</param>
+  /// <returns><c>true</c> when <paramref name="candidate"/> is at least as severe as <paramref name="minimum"/>.</returns>
+  public static bool IsAtOrAbove(this LoggingLevel candidate, LoggingLevel minimum) =>
+    candidate.Index() >= minimum.Index();
 }

@@ -8,6 +8,14 @@ public static class McpMethods
 {
   // ── Core requests (client → server) ──
 
+  /// <summary>
+  /// <c>initialize</c> — the legacy handshake request (§9.2). A spec client that has not switched to
+  /// the modern <c>server/discover</c> flow issues <c>initialize</c>; the server echoes the client's
+  /// requested protocol version, its advertised capabilities, and its identity. On Streamable HTTP this
+  /// is the one method answered as a single non-streaming JSON response with no session (§9.2).
+  /// </summary>
+  public const string Initialize = "initialize";
+
   /// <summary><c>server/discover</c> — discovery + revision negotiation (§5).</summary>
   public const string Discover = "server/discover";
 
@@ -41,6 +49,13 @@ public static class McpMethods
   /// <summary><c>ping</c> — liveness check.</summary>
   public const string Ping = "ping";
 
+  /// <summary>
+  /// <c>logging/setLevel</c> — sets the minimum severity of <c>notifications/message</c> the server emits
+  /// for subsequent requests; Deprecated (§15.3). The server holds the level and gates log emission at or
+  /// above it.
+  /// </summary>
+  public const string LoggingSetLevel = "logging/setLevel";
+
   // ── Tasks extension requests (§25) ──
 
   /// <summary><c>tasks/get</c> — retrieve a task's current state (§25.7).</summary>
@@ -51,6 +66,20 @@ public static class McpMethods
 
   /// <summary><c>tasks/cancel</c> — cancel a task (§25.9).</summary>
   public const string TasksCancel = "tasks/cancel";
+
+  // ── UI extension handshake (UI ↔ host, §26) ──
+
+  /// <summary>
+  /// <c>ui/initialize</c> — the UI-to-host initialization request that begins the §26 handshake
+  /// (Appendix A). In scope only while the Interactive User-Interface extension is active.
+  /// </summary>
+  public const string UiInitialize = "ui/initialize";
+
+  /// <summary>
+  /// <c>ui/notifications/initialized</c> — the UI-to-host notification completing the §26 handshake
+  /// (Appendix A). In scope only while the Interactive User-Interface extension is active.
+  /// </summary>
+  public const string UiNotificationsInitialized = "ui/notifications/initialized";
 
   // ── Input-request kinds (server → client, via input_required result, §11) ──
 

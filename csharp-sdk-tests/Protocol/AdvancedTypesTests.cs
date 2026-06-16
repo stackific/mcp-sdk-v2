@@ -128,7 +128,7 @@ public sealed class AdvancedTypesTests
     });
     Assert.Contains("\"taskId\":\"t\"", json);
     Assert.DoesNotContain("resultType", json); // injected by the runtime, not the record
-    Assert.DoesNotContain("ttlMs", json); // null ⇒ omitted (unbounded lifetime)
+    Assert.Contains("\"ttlMs\":null", json); // REQUIRED (number | null) — emitted as null, never omitted (§25.4)
   }
 
   [Fact]

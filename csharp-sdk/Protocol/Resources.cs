@@ -1,5 +1,8 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+
+using Stackific.Mcp.JsonRpc;
 
 namespace Stackific.Mcp.Protocol;
 
@@ -120,4 +123,189 @@ public sealed record ResourceUpdatedNotificationParams
 {
   /// <summary>REQUIRED. The URI of the resource that changed (MAY be a sub-resource of the subscribed URI).</summary>
   public required string Uri { get; init; }
+}
+
+/// <summary>
+/// The discriminated outcome of inspecting a <c>resources/read</c> reply (spec §17.5): a completed
+/// <see cref="ReadResourceResult"/>, an <c>input_required</c> continuation, or a malformed body.
+/// </summary>
+public enum ReadResourceResponseKind
+{
+  /// <summary>A completed read carrying <c>contents</c> (the absent-⇒-complete default applies, R-17.5-q).</summary>
+  Complete,
+
+  /// <summary>The server needs additional client input before the read can complete (R-17.5-w).</summary>
+  InputRequired,
+
+  /// <summary>The reply did not match either expected shape.</summary>
+  Error,
+}
+
+/// <summary>
+/// The result of <see cref="Resources.DiscriminateReadResourceResponse"/>: which branch a
+/// <c>resources/read</c> reply fell into, plus the parsed payload for the matched branch (spec §17.5).
+/// </summary>
+/// <param name="Kind">Which branch the reply matched.</param>
+/// <param name="Result">The completed read result when <see cref="Kind"/> is <see cref="ReadResourceResponseKind.Complete"/>.</param>
+/// <param name="InputRequired">The continuation when <see cref="Kind"/> is <see cref="ReadResourceResponseKind.InputRequired"/>.</param>
+/// <param name="Reason">A human-readable reason when <see cref="Kind"/> is <see cref="ReadResourceResponseKind.Error"/>.</param>
+public sealed record ReadResourceResponseDiscrimination(
+  ReadResourceResponseKind Kind,
+  ReadResourceResult? Result,
+  InputRequiredResult? InputRequired,
+  string? Reason);
+
+/// <summary>
+/// The §17.4–§17.6 normative resource helpers ported from the TypeScript SDK's <c>resources.ts</c> /
+/// <c>resources-read.ts</c>: RFC 3986 / RFC 6570 validation (delegating the grammar to
+/// <see cref="UriTemplate"/>), the not-found error model (modern <c>-32602</c> plus legacy
+/// <c>-32002</c> client acceptance), the empty-<c>contents</c> guard, and the read-reply
+/// discrimination that tolerates an absent <c>resultType</c> and recognises the <c>input_required</c>
+/// continuation.
+/// </summary>
+public static class Resources
+{
+  /// <summary>The modern resource-not-found code: <c>-32602</c> (Invalid params), carrying <c>data.uri</c> (§17.6, R-17.6-a/b).</summary>
+  public const int ResourceNotFoundCode = ErrorCodes.InvalidParams;
+
+  /// <summary>
+  /// The LEGACY resource-not-found code, <c>-32002</c>. An earlier protocol revision used this for the
+  /// not-found condition; for interoperability a client SHOULD treat it as resource-not-found in
+  /// ADDITION to <c>-32602</c>. A modern server MUST NOT mint it. (§17.6, R-17.6-c)
+  /// </summary>
+  public const int LegacyResourceNotFoundCode = ErrorRegistry.ResourceNotFoundLegacyCode;
+
+  /// <summary>
+  /// The code a server SHOULD return for an internal failure UNRELATED to the validity of the
+  /// requested <c>uri</c> (e.g. a backing store is unreachable): <c>-32603</c> (Internal error).
+  /// (§17.6, R-17.6-d)
+  /// </summary>
+  public const int ResourceReadInternalErrorCode = ErrorCodes.InternalError;
+
+  /// <summary>
+  /// Returns <c>true</c> when <paramref name="value"/> is a string in URI format [RFC 3986] usable as a
+  /// concrete <c>Resource.uri</c>. Delegates to <see cref="UriTemplate.IsResourceUri"/>. (§17.4, R-17.4-a, R-17.4-b)
+  /// </summary>
+  /// <param name="value">The candidate URI string.</param>
+  /// <returns><c>true</c> when the value is an absolute RFC 3986 URI with a scheme.</returns>
+  public static bool IsResourceUri(string? value) => UriTemplate.IsResourceUri(value);
+
+  /// <summary>
+  /// Returns <c>true</c> when <paramref name="value"/> conforms to the URI Template grammar of
+  /// [RFC 6570]. Delegates to <see cref="UriTemplate.IsUriTemplate"/>. (§17.4, R-17.4-m)
+  /// </summary>
+  /// <param name="value">The candidate URI-template string.</param>
+  /// <returns><c>true</c> when the value is a well-formed RFC 6570 template.</returns>
+  public static bool IsUriTemplate(string? value) => UriTemplate.IsUriTemplate(value);
+
+  /// <summary>
+  /// Returns the variable names referenced by a URI template, in first-seen order. Delegates to
+  /// <see cref="UriTemplate.Variables"/>. (§17.4, R-17.4-n)
+  /// </summary>
+  /// <param name="template">The URI template to inspect.</param>
+  /// <returns>The distinct variable names.</returns>
+  public static IReadOnlyList<string> UriTemplateVariables(string template) => UriTemplate.Variables(template);
+
+  /// <summary>
+  /// Returns <c>true</c> when <paramref name="code"/> denotes resource-not-found from a CLIENT's
+  /// perspective — the modern <c>-32602</c> or the legacy <c>-32002</c>. A client SHOULD accept both.
+  /// (§17.6, R-17.6-a, R-17.6-c)
+  /// </summary>
+  /// <param name="code">The error code to test.</param>
+  /// <returns><c>true</c> when the code means resource-not-found.</returns>
+  public static bool IsResourceNotFoundCode(int code) =>
+    code == ResourceNotFoundCode || code == LegacyResourceNotFoundCode;
+
+  /// <summary>
+  /// Builds the modern resource-not-found error: <c>-32602</c> (Invalid params) carrying the offending
+  /// <c>uri</c> in <c>data.uri</c>. A server MUST signal non-existence with this error — NOT an empty
+  /// <c>contents</c> result. (§17.5, §17.6, R-17.5-z, R-17.6-a, R-17.6-b)
+  /// </summary>
+  /// <param name="uri">The offending resource URI.</param>
+  /// <param name="message">An optional override; defaults to <c>"Resource not found"</c>.</param>
+  /// <returns>The constructed error.</returns>
+  public static McpError BuildResourceNotFoundError(string uri, string message = "Resource not found") =>
+    McpError.InvalidParams(message, new JsonObject { ["uri"] = uri });
+
+  /// <summary>
+  /// Builds the <c>-32603</c> (Internal error) a server SHOULD return for a failure UNRELATED to the
+  /// validity of the requested <c>uri</c> — distinct from <see cref="BuildResourceNotFoundError"/>,
+  /// which is for a <c>uri</c> that simply does not exist. (§17.6, R-17.6-d)
+  /// </summary>
+  /// <param name="message">An optional override; defaults to <c>"Internal error reading resource"</c>.</param>
+  /// <returns>The constructed error.</returns>
+  public static McpError BuildResourceReadInternalError(string message = "Internal error reading resource") =>
+    McpError.InternalError(message);
+
+  /// <summary>
+  /// Asserts a <c>resources/read</c> result's <c>contents</c> array is non-empty, throwing
+  /// <c>-32603</c> (Internal error) otherwise. A server MUST NOT use an empty <c>contents</c> array to
+  /// signal non-existence — that case is the <c>-32602</c> not-found error
+  /// (<see cref="BuildResourceNotFoundError"/>). When a handler returns empty contents for a URI it
+  /// claims to serve, that is a server-side fault, hence the internal-error code. (§17.5, R-17.5-z,
+  /// R-17.5-aa)
+  /// </summary>
+  /// <param name="result">The read result to guard.</param>
+  /// <param name="uri">The requested URI, used in the error message.</param>
+  /// <exception cref="McpError">A <c>-32603</c> error when <c>contents</c> is empty.</exception>
+  public static void GuardNonEmptyContents(ReadResourceResult result, string uri)
+  {
+    ArgumentNullException.ThrowIfNull(result);
+    if (result.Contents.Count == 0)
+    {
+      throw BuildResourceReadInternalError(
+        $"resources/read for \"{uri}\" returned empty contents; signal non-existence with a -32602 error, not an empty array (R-17.5-z)");
+    }
+  }
+
+  /// <summary>
+  /// Branches a <c>resources/read</c> reply on its <c>resultType</c> discriminator (§17.5):
+  /// <c>"input_required"</c> ⇒ a continuation (R-17.5-w); <c>"complete"</c> or an ABSENT
+  /// <c>resultType</c> ⇒ a completed <see cref="ReadResourceResult"/> (the absent-⇒-complete default,
+  /// R-17.5-q); any other value or a body that fails its shape ⇒ an error branch.
+  /// </summary>
+  /// <param name="response">The raw <c>result</c> object received on the wire.</param>
+  /// <returns>The discriminated outcome.</returns>
+  public static ReadResourceResponseDiscrimination DiscriminateReadResourceResponse(JsonNode? response)
+  {
+    if (response is not JsonObject obj)
+    {
+      return new ReadResourceResponseDiscrimination(
+        ReadResourceResponseKind.Error, null, null, "read result is not a JSON object");
+    }
+
+    var resultType = obj["resultType"] is JsonValue rt && rt.GetValueKind() == JsonValueKind.String
+      ? rt.GetValue<string>()
+      : ResultTypes.Complete; // absent ⇒ complete (R-17.5-q)
+
+    if (resultType == ResultTypes.InputRequired)
+    {
+      var inputRequired = obj.Deserialize<InputRequiredResult>(McpJson.Options);
+      return inputRequired is null
+        ? new ReadResourceResponseDiscrimination(
+            ReadResourceResponseKind.Error, null, null, "malformed input_required read result")
+        : new ReadResourceResponseDiscrimination(
+            ReadResourceResponseKind.InputRequired, null, inputRequired, null);
+    }
+
+    if (resultType != ResultTypes.Complete)
+    {
+      return new ReadResourceResponseDiscrimination(
+        ReadResourceResponseKind.Error, null, null, $"unrecognized resultType \"{resultType}\"");
+    }
+
+    try
+    {
+      var result = obj.Deserialize<ReadResourceResult>(McpJson.Options);
+      return result is null || result.Contents is null
+        ? new ReadResourceResponseDiscrimination(
+            ReadResourceResponseKind.Error, null, null, "malformed ReadResourceResult (missing contents)")
+        : new ReadResourceResponseDiscrimination(ReadResourceResponseKind.Complete, result, null, null);
+    }
+    catch (JsonException ex)
+    {
+      return new ReadResourceResponseDiscrimination(
+        ReadResourceResponseKind.Error, null, null, $"malformed ReadResourceResult: {ex.Message}");
+    }
+  }
 }

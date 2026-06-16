@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -38,6 +39,10 @@ public static class McpJson
       // or trailing commas, and read strictly.
       ReadCommentHandling = JsonCommentHandling.Disallow,
       AllowTrailingCommas = false,
+      // The wire is JSON in HTTP bodies (not HTML), so use the relaxed encoder: it emits
+      // characters like ', <, >, & literally — matching JSON.stringify (and the TypeScript
+      // SDK) byte-for-byte — while still escaping control characters, quotes, and backslashes.
+      Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
     options.Converters.Add(new RequestIdJsonConverter());
     // Freeze the options, populating the default reflection-based type resolver so the SDK

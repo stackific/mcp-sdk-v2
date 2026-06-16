@@ -1,10 +1,12 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Stackific.Mcp.Json;
 using Stackific.Mcp.JsonRpc;
 using Stackific.Mcp.Protocol;
+using Stackific.Mcp.Transport.Http;
 
 namespace Stackific.Mcp.Transport;
 
@@ -21,17 +23,31 @@ public sealed class StreamableHttpClientTransport : ClientTransport
   private readonly HttpClient _httpClient;
   private readonly bool _ownsHttpClient;
   private readonly Func<CancellationToken, Task<string?>>? _tokenProvider;
+  private readonly Func<string, JsonNode?>? _learnedToolSchema;
 
   /// <summary>Creates a transport targeting <paramref name="endpoint"/>.</summary>
   /// <param name="endpoint">The MCP endpoint URL (for example <c>http://localhost:8201/mcp</c>).</param>
   /// <param name="httpClient">An optional shared <see cref="HttpClient"/>; one is created and owned if omitted.</param>
   /// <param name="tokenProvider">An optional async provider of the bearer token to attach (§23).</param>
-  public StreamableHttpClientTransport(Uri endpoint, HttpClient? httpClient = null, Func<CancellationToken, Task<string?>>? tokenProvider = null)
+  /// <param name="learnedToolSchema">
+  /// An optional resolver from a tool name to its learned <c>inputSchema</c> (typically populated from a
+  /// prior <c>tools/list</c>). When supplied, the transport emits the <c>Mcp-Param-*</c> headers a
+  /// <c>tools/call</c>'s <c>x-mcp-header</c> annotations require (§9.5.2), encoded per §9.5.3. When
+  /// <c>null</c> (the default), no custom <c>Mcp-Param-*</c> headers are emitted (the stale/absent-schema
+  /// strategy, R-9.5.2-l). The per-call learning that feeds this resolver is a client-runtime concern
+  /// (Phase 5) and is intentionally left as a seam.
+  /// </param>
+  public StreamableHttpClientTransport(
+    Uri endpoint,
+    HttpClient? httpClient = null,
+    Func<CancellationToken, Task<string?>>? tokenProvider = null,
+    Func<string, JsonNode?>? learnedToolSchema = null)
   {
     _endpoint = endpoint;
     _httpClient = httpClient ?? new HttpClient();
     _ownsHttpClient = httpClient is null;
     _tokenProvider = tokenProvider;
+    _learnedToolSchema = learnedToolSchema;
   }
 
   /// <inheritdoc/>
@@ -159,7 +175,7 @@ public sealed class StreamableHttpClientTransport : ClientTransport
   private HttpRequestMessage BuildHttpRequest(JsonRpcRequest request) =>
     BuildHttpRequest(request, request.Method, request.Params);
 
-  private HttpRequestMessage BuildHttpRequest(JsonRpcMessage message, string method, System.Text.Json.Nodes.JsonObject? prms)
+  private HttpRequestMessage BuildHttpRequest(JsonRpcMessage message, string method, JsonObject? prms)
   {
     var httpRequest = new HttpRequestMessage(HttpMethod.Post, _endpoint)
     {
@@ -181,7 +197,35 @@ public sealed class StreamableHttpClientTransport : ClientTransport
     };
     if (name is not null) httpRequest.Headers.TryAddWithoutValidation("Mcp-Name", name);
 
+    // §9.5.2: for a tools/call against a tool whose schema carries x-mcp-header annotations, emit one
+    // encoded Mcp-Param-* header per present, non-null annotated parameter. Absent a learned schema, no
+    // custom param headers are emitted (R-9.5.2-l).
+    AttachParamHeaders(httpRequest, method, prms);
+
     return httpRequest;
+  }
+
+  /// <summary>
+  /// Attaches the <c>Mcp-Param-*</c> headers a <c>tools/call</c> requires from its tool's learned
+  /// <c>inputSchema</c> and the call <c>arguments</c> (§9.5.2). This is the client EMISSION primitive;
+  /// it is a no-op when no learned-schema resolver was supplied or the tool is unknown.
+  /// </summary>
+  private void AttachParamHeaders(HttpRequestMessage httpRequest, string method, JsonObject? prms)
+  {
+    if (method != McpMethods.ToolsCall || _learnedToolSchema is null)
+    {
+      return;
+    }
+    var toolName = prms?["name"]?.GetValue<string>();
+    if (toolName is null || _learnedToolSchema(toolName) is not { } inputSchema)
+    {
+      return;
+    }
+    var arguments = prms?["arguments"] as JsonObject;
+    foreach (var (headerName, headerValue) in ParamHeaders.BuildParamHeaders(inputSchema, arguments))
+    {
+      httpRequest.Headers.TryAddWithoutValidation(headerName, headerValue);
+    }
   }
 
   private async Task AttachAuthorizationAsync(HttpRequestMessage httpRequest, CancellationToken cancellationToken)

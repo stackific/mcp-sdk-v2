@@ -46,10 +46,41 @@ public sealed record ClientCapabilities
   [JsonIgnore]
   public bool SupportsRoots => Roots is not null;
 
-  /// <summary>Returns <c>true</c> if the client advertised the extension <paramref name="identifier"/> (§6.5).</summary>
+  /// <summary><c>true</c> if the client declared an <c>experimental</c> map (presence means supported, §6.2).</summary>
+  [JsonIgnore]
+  public bool SupportsExperimental => Experimental is not null;
+
+  /// <summary><c>true</c> if the client declared an <c>extensions</c> map (presence means supported, §6.5).</summary>
+  [JsonIgnore]
+  public bool SupportsExtensions => Extensions is not null;
+
+  /// <summary>
+  /// <c>true</c> if the client declared the deprecated <c>sampling.context</c> sub-flag (§6.2, R-6.2-n).
+  /// This gates non-<c>none</c> <c>includeContext</c> during sampling (see
+  /// <c>CapabilityNegotiation.MayUseIncludeContext</c>).
+  /// </summary>
+  [JsonIgnore]
+  public bool SupportsSamplingContext => Sampling?.Context is not null;
+
+  /// <summary>
+  /// <c>true</c> if the client declared the deprecated <c>sampling.tools</c> sub-flag (§6.2, R-6.2-p).
+  /// This gates supplying <c>tools</c>/<c>toolChoice</c> during sampling (see
+  /// <c>CapabilityNegotiation.MayUseSamplingTools</c>).
+  /// </summary>
+  [JsonIgnore]
+  public bool SupportsSamplingTools => Sampling?.Tools is not null;
+
+  /// <summary>
+  /// Returns <c>true</c> if the client VALIDLY advertised the extension <paramref name="identifier"/>
+  /// (§6.5). Routed through <see cref="Protocol.Extensions.IsAdvertised"/> so an entry that is present
+  /// but malformed — a <c>null</c> or non-object settings value — is NOT treated as advertised
+  /// (R-6.5-j). A bare <see cref="System.Collections.Generic.IDictionary{TKey,TValue}.ContainsKey"/>
+  /// check would wrongly count a <c>null</c>-valued key.
+  /// </summary>
   /// <param name="identifier">The extension identifier, for example <c>io.modelcontextprotocol/tasks</c>.</param>
-  /// <returns><c>true</c> when advertised.</returns>
-  public bool HasExtension(string identifier) => Extensions is not null && Extensions.ContainsKey(identifier);
+  /// <returns><c>true</c> when validly advertised.</returns>
+  public bool HasExtension(string identifier) =>
+    Protocol.Extensions.IsAdvertised(CapabilityExtensions.ToRawMap(Extensions), identifier);
 }
 
 /// <summary>Client elicitation capability with its mode sub-flags (spec §6.2/§20).</summary>
@@ -99,10 +130,83 @@ public sealed record ServerCapabilities
   /// <summary>The MCP extensions the server supports, keyed by extension identifier (§6.5).</summary>
   public IDictionary<string, JsonObject>? Extensions { get; init; }
 
-  /// <summary>Returns <c>true</c> if the server advertised the extension <paramref name="identifier"/> (§6.5).</summary>
+  /// <summary><c>true</c> if the server declared a <c>prompts</c> capability (presence means supported, §6.3).</summary>
+  [JsonIgnore]
+  public bool DeclaresPrompts => Prompts is not null;
+
+  /// <summary><c>true</c> if the server declared a <c>resources</c> capability (presence means supported, §6.3).</summary>
+  [JsonIgnore]
+  public bool DeclaresResources => Resources is not null;
+
+  /// <summary><c>true</c> if the server declared a <c>tools</c> capability (presence means supported, §6.3).</summary>
+  [JsonIgnore]
+  public bool DeclaresTools => Tools is not null;
+
+  /// <summary><c>true</c> if the server declared a <c>completions</c> capability (presence means supported, §6.3).</summary>
+  [JsonIgnore]
+  public bool DeclaresCompletions => Completions is not null;
+
+  /// <summary><c>true</c> if the server declared the deprecated <c>logging</c> capability (§6.3, §15.3).</summary>
+  [JsonIgnore]
+  public bool DeclaresLogging => Logging is not null;
+
+  /// <summary>
+  /// <c>true</c> only when <c>prompts.listChanged</c> is explicitly <c>true</c> — absent or <c>false</c>
+  /// means not declared (§6.3, R-6.3-h). The boolean sub-flags follow "true means declared".
+  /// </summary>
+  [JsonIgnore]
+  public bool DeclaresPromptsListChanged => Prompts?.ListChanged == true;
+
+  /// <summary><c>true</c> only when <c>resources.subscribe</c> is explicitly <c>true</c> (§6.3, R-6.3-l).</summary>
+  [JsonIgnore]
+  public bool DeclaresResourcesSubscribe => Resources?.Subscribe == true;
+
+  /// <summary><c>true</c> only when <c>resources.listChanged</c> is explicitly <c>true</c> (§6.3, R-6.3-l).</summary>
+  [JsonIgnore]
+  public bool DeclaresResourcesListChanged => Resources?.ListChanged == true;
+
+  /// <summary><c>true</c> only when <c>tools.listChanged</c> is explicitly <c>true</c> (§6.3, R-6.3-o).</summary>
+  [JsonIgnore]
+  public bool DeclaresToolsListChanged => Tools?.ListChanged == true;
+
+  /// <summary>
+  /// Returns <c>true</c> if the server VALIDLY advertised the extension <paramref name="identifier"/>
+  /// (§6.5). Routed through <see cref="Protocol.Extensions.IsAdvertised"/> so an entry that is present
+  /// but malformed — a <c>null</c> or non-object settings value — is NOT treated as advertised
+  /// (R-6.5-j). A bare <see cref="System.Collections.Generic.IDictionary{TKey,TValue}.ContainsKey"/>
+  /// check would wrongly count a <c>null</c>-valued key.
+  /// </summary>
   /// <param name="identifier">The extension identifier.</param>
-  /// <returns><c>true</c> when advertised.</returns>
-  public bool HasExtension(string identifier) => Extensions is not null && Extensions.ContainsKey(identifier);
+  /// <returns><c>true</c> when validly advertised.</returns>
+  public bool HasExtension(string identifier) =>
+    Protocol.Extensions.IsAdvertised(CapabilityExtensions.ToRawMap(Extensions), identifier);
+}
+
+/// <summary>
+/// Helpers shared by <see cref="ClientCapabilities"/> and <see cref="ServerCapabilities"/> for
+/// routing the typed <c>extensions</c> dictionary through the raw-map advertisement checks in
+/// <see cref="Extensions"/> (R-6.5-j).
+/// </summary>
+internal static class CapabilityExtensions
+{
+  /// <summary>
+  /// Projects a typed <c>extensions</c> dictionary into the raw <see cref="JsonObject"/> map shape
+  /// <see cref="Extensions.IsAdvertised"/> consumes. A <c>null</c>-valued entry (a JSON <c>null</c>
+  /// that deserialized into the dictionary) is preserved AS a JSON <c>null</c> so the advertisement
+  /// check correctly rejects it (R-6.5-j); a non-null settings object is carried through.
+  /// </summary>
+  /// <param name="extensions">The typed extensions dictionary, or <c>null</c> when none.</param>
+  /// <returns>The raw map, or <c>null</c> when <paramref name="extensions"/> is <c>null</c>.</returns>
+  public static JsonObject? ToRawMap(IDictionary<string, JsonObject>? extensions)
+  {
+    if (extensions is null) return null;
+    var raw = new JsonObject();
+    foreach (var (key, value) in extensions)
+    {
+      raw[key] = value?.DeepClone();
+    }
+    return raw;
+  }
 }
 
 /// <summary>Server prompts capability (spec §6.3/§18).</summary>

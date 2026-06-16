@@ -161,13 +161,31 @@ public sealed class McpClient : IAsyncDisposable
   /// <summary>
   /// Invokes a tool as a task (spec §25.3): the client must have declared the Tasks extension, and the
   /// server returns a task handle (<c>resultType: "task"</c>) for an eligible tool. Poll with
-  /// <see cref="GetTaskAsync"/>.
+  /// <see cref="GetTaskAsync"/> or drive to completion with <see cref="PollTaskUntilTerminalAsync"/>.
   /// </summary>
   /// <param name="name">The tool name.</param>
   /// <param name="arguments">The arguments object.</param>
+  /// <param name="ttlMs">
+  /// The requested task lifetime in milliseconds, sent as <c>task.ttl</c> (§25.4). The default 5-minute
+  /// lifetime (300000) is used when this is the sentinel <see cref="DefaultTaskTtlMs"/>; pass <c>null</c>
+  /// for an explicitly unbounded lifetime; pass a non-negative number to override.
+  /// </param>
   /// <returns>The raw result object (a <c>CreateTaskResult</c> when the server made it a task).</returns>
-  public Task<JsonObject> CreateTaskAsync(string name, JsonObject? arguments = null) =>
-    RequestAsync(McpMethods.ToolsCall, new JsonObject { ["name"] = name, ["arguments"] = arguments?.DeepClone() ?? new JsonObject() });
+  public Task<JsonObject> CreateTaskAsync(string name, JsonObject? arguments = null, long? ttlMs = DefaultTaskTtlMs)
+  {
+    // Mirror the TS createTask: a default ttl of 300000 unless the caller opted into a different lifetime.
+    var task = new JsonObject();
+    task["ttl"] = ttlMs == DefaultTaskTtlMs ? 300000 : (ttlMs is { } v ? JsonValue.Create(v) : null);
+    return RequestAsync(McpMethods.ToolsCall, new JsonObject
+    {
+      ["name"] = name,
+      ["arguments"] = arguments?.DeepClone() ?? new JsonObject(),
+      ["task"] = task,
+    });
+  }
+
+  /// <summary>The sentinel default for <see cref="CreateTaskAsync"/>'s <c>ttlMs</c> meaning "use the protocol default lifetime" (§25.4).</summary>
+  public const long DefaultTaskTtlMs = long.MinValue;
 
   /// <summary>Retrieves a task's current detailed state (spec §25.7).</summary>
   /// <param name="taskId">The task id.</param>
@@ -175,11 +193,75 @@ public sealed class McpClient : IAsyncDisposable
   public Task<JsonObject> GetTaskAsync(string taskId) =>
     RequestAsync(McpMethods.TasksGet, new JsonObject { ["taskId"] = taskId });
 
+  /// <summary>
+  /// Supplies input to a task awaiting it via <c>tasks/update</c> (spec §25.8): the responses are keyed
+  /// by a currently-outstanding <c>inputRequests</c> key from the task's <c>input_required</c> state. The
+  /// server binds the outstanding subset, drops stale keys (R-25.8-h), and advances the task.
+  /// </summary>
+  /// <param name="taskId">The task id.</param>
+  /// <param name="inputResponses">The responses keyed by outstanding input-request key.</param>
+  /// <returns>The acknowledgement result object (the task's resulting <c>DetailedTask</c>).</returns>
+  public Task<JsonObject> UpdateTaskAsync(string taskId, JsonObject inputResponses)
+  {
+    ArgumentNullException.ThrowIfNull(inputResponses);
+    return RequestAsync(McpMethods.TasksUpdate, new JsonObject
+    {
+      ["taskId"] = taskId,
+      ["inputResponses"] = inputResponses.DeepClone(),
+    });
+  }
+
   /// <summary>Requests cancellation of a task (spec §25.9).</summary>
   /// <param name="taskId">The task id.</param>
-  /// <returns>The (empty) acknowledgement result object.</returns>
+  /// <returns>The acknowledgement result object (the task's resulting <c>DetailedTask</c>).</returns>
   public Task<JsonObject> CancelTaskAsync(string taskId) =>
     RequestAsync(McpMethods.TasksCancel, new JsonObject { ["taskId"] = taskId });
+
+  /// <summary>
+  /// Polls <c>tasks/get</c> until the task reaches a terminal status — <c>completed</c>, <c>failed</c>,
+  /// or <c>cancelled</c> (spec §25.5, §25.7) — then returns the final detailed task object. Honors the
+  /// task's recommended <c>pollIntervalMs</c> (adopting the latest observed value, §25.7) and supports an
+  /// overall timeout and a cancellation signal.
+  /// </summary>
+  /// <param name="taskId">The task id.</param>
+  /// <param name="timeout">An optional overall timeout; on expiry an <see cref="McpError"/> is thrown.</param>
+  /// <param name="fallbackIntervalMs">The poll interval used when the task advertises no <c>pollIntervalMs</c>.</param>
+  /// <param name="cancellationToken">Cancels the poll loop.</param>
+  /// <returns>The terminal detailed task object.</returns>
+  /// <exception cref="McpError">-32602 propagated for an unknown/expired task; -32603 on timeout.</exception>
+  public async Task<JsonObject> PollTaskUntilTerminalAsync(
+    string taskId,
+    TimeSpan? timeout = null,
+    long fallbackIntervalMs = 500,
+    CancellationToken cancellationToken = default)
+  {
+    var deadline = timeout is { } t ? DateTimeOffset.UtcNow + t : (DateTimeOffset?)null;
+    long? adoptedInterval = null;
+    while (true)
+    {
+      cancellationToken.ThrowIfCancellationRequested();
+      var task = await GetTaskAsync(taskId).ConfigureAwait(false); // propagates -32602 for unknown/expired
+
+      // §25.7: stop on a terminal status.
+      if (task["status"] is JsonValue sv && sv.GetValueKind() == JsonValueKind.String
+        && Tasks.TryParseStatus(sv.GetValue<string>(), out var status) && Tasks.IsTerminalTaskStatus(status))
+      {
+        return task;
+      }
+
+      // §25.7: adopt the latest advertised pollIntervalMs for the cadence.
+      var latest = task["pollIntervalMs"] is JsonValue pv && pv.GetValueKind() == JsonValueKind.Number && pv.TryGetValue(out long p)
+        ? (long?)p : null;
+      var interval = Tasks.AdoptLatestPollIntervalMs(latest, adoptedInterval, fallbackIntervalMs);
+      adoptedInterval = interval;
+
+      if (deadline is { } d && DateTimeOffset.UtcNow >= d)
+      {
+        throw McpError.InternalError($"Task \"{taskId}\" did not reach a terminal status within the timeout.");
+      }
+      await Task.Delay(TimeSpan.FromMilliseconds(interval), cancellationToken).ConfigureAwait(false);
+    }
+  }
 
   /// <summary>
   /// Opens a subscription stream for server-initiated change notifications (spec §10): sends
@@ -190,11 +272,20 @@ public sealed class McpClient : IAsyncDisposable
   /// <param name="onNotification">Invoked for each change notification on the stream.</param>
   /// <param name="cancellationToken">Cancels opening the stream.</param>
   /// <returns>A handle carrying the honored filter and an unsubscribe action.</returns>
-  public Task<SubscriptionHandle> SubscribeAsync(
+  /// <remarks>
+  /// The subscription's request-scoped lifecycle (spec §10.7) is tracked through a client-side
+  /// <see cref="SubscriptionRegistry"/>: a <see cref="Subscription"/> is created and acknowledged
+  /// (<c>opening</c> → <c>active</c>) on open, routed by <c>io.modelcontextprotocol/subscriptionId</c>,
+  /// and closed (with the <see cref="SubscriptionCloseReason.ClientCancel"/> reason) and removed on
+  /// unsubscribe. The id is the <c>subscriptions/listen</c> request id (R-10.4-c). Inspect the registry
+  /// via <see cref="ActiveSubscriptionIds"/> / <see cref="GetSubscription"/>.
+  /// </remarks>
+  public async Task<SubscriptionHandle> SubscribeAsync(
     SubscriptionFilter filter,
     Action<JsonRpcNotification>? onNotification = null,
     CancellationToken cancellationToken = default)
   {
+    var listenId = new RequestId(Interlocked.Increment(ref _nextId));
     var prms = new JsonObject
     {
       ["notifications"] = JsonSerializer.SerializeToNode(filter, McpJson.Options),
@@ -205,9 +296,53 @@ public sealed class McpClient : IAsyncDisposable
         ClientCapabilities = _capabilities,
       }.ToJsonObject(),
     };
-    var request = new JsonRpcRequest(new RequestId(Interlocked.Increment(ref _nextId)), McpMethods.SubscriptionsListen, prms);
-    return _transport.OpenSubscriptionAsync(request, onNotification ?? (_ => { }), cancellationToken);
+    var request = new JsonRpcRequest(listenId, McpMethods.SubscriptionsListen, prms);
+
+    // §10.7: track the subscription's lifecycle. The acknowledged filter is computed against the
+    // server's discovered capabilities; the Tasks extension being active (for taskIds) requires both
+    // peers to advertise it. The subscription transitions opening → active on Acknowledge().
+    var serverCaps = _discovered?.Capabilities;
+    var tasksActive = (serverCaps?.HasExtension(MetaKeys.TasksExtension) ?? false)
+      && _capabilities.HasExtension(MetaKeys.TasksExtension);
+    var subscription = new Subscription(listenId, filter, serverCaps, tasksActive);
+    subscription.Acknowledge();
+    _subscriptionRegistry.Add(subscription);
+    var subscriptionId = subscription.SubscriptionId;
+
+    var handle = await _transport.OpenSubscriptionAsync(
+      request,
+      // §10.4: route each notification by its subscription id; ignore one that does not target us.
+      notification =>
+      {
+        if (subscription.IsClosed) return;
+        var routedId = SubscriptionRegistry.ReadSubscriptionId(notification.Params);
+        if (routedId is not null && !string.Equals(routedId, subscriptionId, StringComparison.Ordinal)) return;
+        onNotification?.Invoke(notification);
+      },
+      cancellationToken).ConfigureAwait(false);
+
+    return new SubscriptionHandle
+    {
+      HonoredFilter = handle.HonoredFilter,
+      Unsubscribe = async () =>
+      {
+        // §10.7: closing the subscription is a client cancel; remove it (no retained state) and tear down
+        // the transport stream. Idempotent — a second unsubscribe is a no-op once already removed.
+        _subscriptionRegistry.Remove(subscriptionId, SubscriptionCloseReason.ClientCancel);
+        await handle.Unsubscribe().ConfigureAwait(false);
+      },
+    };
   }
+
+  private readonly SubscriptionRegistry _subscriptionRegistry = new();
+
+  /// <summary>The ids of the client's currently-active subscriptions (spec §10.7).</summary>
+  public IReadOnlyList<string> ActiveSubscriptionIds => _subscriptionRegistry.ActiveIds;
+
+  /// <summary>Returns the active <see cref="Subscription"/> with <paramref name="subscriptionId"/>, or <c>null</c> (spec §10.7).</summary>
+  /// <param name="subscriptionId">The subscription id.</param>
+  /// <returns>The subscription, or <c>null</c> when not active.</returns>
+  public Subscription? GetSubscription(string subscriptionId) => _subscriptionRegistry.Get(subscriptionId);
 
   /// <summary>
   /// Registers a handler for a server-initiated input request kind (spec §11): <c>elicitation/create</c>
@@ -243,6 +378,12 @@ public sealed class McpClient : IAsyncDisposable
   public async Task<JsonObject> RequestWithInputAsync(string method, JsonObject? paramsBody = null, RequestOptions? options = null)
   {
     var baseParams = paramsBody is null ? new JsonObject() : (JsonObject)paramsBody.DeepClone();
+    var capabilities = JsonSerializer.SerializeToNode(_capabilities, McpJson.Options)!.AsObject();
+
+    // The server is stateless per round and reconstructs the conversation from the FULL accumulated set
+    // of inputResponses the client re-sends each round (keyed by the server's per-call-site keys), plus
+    // the echoed opaque requestState continuation token (§11.3). We therefore accumulate responses across
+    // rounds rather than sending only the latest.
     var inputResponses = new JsonObject();
     string? requestState = null;
 
@@ -253,18 +394,32 @@ public sealed class McpClient : IAsyncDisposable
       if (requestState is not null) prms["requestState"] = requestState;
 
       var result = await RequestAsync(method, prms, options).ConfigureAwait(false);
-      var resultType = (result["resultType"] as JsonValue)?.GetValue<string>() ?? ResultTypes.Complete;
-      if (resultType != ResultTypes.InputRequired) return result;
 
-      var inputRequired = result.Deserialize<InputRequiredResult>(McpJson.Options)
-        ?? throw McpError.InternalError("Could not read an input_required result.");
-      requestState = inputRequired.RequestState;
-
-      if (inputRequired.InputRequests is null || inputRequired.InputRequests.Count == 0)
+      // §11.5: discriminate the result against our own declared capabilities. An undeclared requested
+      // input-request kind (R-11.5-k), an unrecognized resultType (R-11.5-d), or a malformed
+      // input_required result all make the whole result an error — we MUST NOT fulfill it (S17-RQ-18).
+      var decision = MultiRoundTrip.DiscriminateResultType(result, capabilities);
+      switch (decision.Action)
       {
-        continue; // §11.5 load-shedding: retry, echoing requestState, with no new responses.
+        case ResultDiscriminationAction.Complete:
+          return result;
+        case ResultDiscriminationAction.Error:
+          throw McpError.InvalidParams($"Multi-round-trip result error: {decision.Reason}");
       }
 
+      var inputRequired = decision.Result!;
+      requestState = inputRequired.RequestState; // echo the latest continuation token verbatim (§11.3).
+
+      // §11.5 load-shedding: an input_required result with only requestState (no inputRequests) means
+      // "retry later" — echo requestState with no new responses, applying a bounded backoff (R-11.5-n).
+      if (inputRequired.InputRequests is null || inputRequired.InputRequests.Count == 0)
+      {
+        var delay = MultiRoundTrip.ComputeRetryBackoffMs(round + 1);
+        if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay)).ConfigureAwait(false);
+        continue;
+      }
+
+      // Fulfill each newly-requested kind via its registered handler and accumulate the response.
       foreach (var (key, inputRequest) in inputRequired.InputRequests)
       {
         if (!_inputHandlers.TryGetValue(inputRequest.Method, out var handler))
