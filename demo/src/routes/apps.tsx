@@ -23,6 +23,9 @@ export function AppsPage() {
   // Receive messages from the sandboxed MCP App (the postMessage bridge).
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
+      // Only accept messages from our sandboxed app iframe — its origin is "null",
+      // so verify the source window rather than the origin (js/missing-origin-check).
+      if (e.source !== frameRef.current?.contentWindow) return;
       const msg = e.data;
       if (!msg || msg.source !== 'mcp-app') return;
       setLog((l) => [...l, { dir: 'in', type: msg.type, payload: msg.payload }]);

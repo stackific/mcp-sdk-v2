@@ -68,7 +68,7 @@ export interface BearerAuthGateOptions {
 
 /** Reads the token audience (`aud` or `audience`) from a validated authInfo object. */
 function audienceOf(authInfo: unknown): string | string[] | undefined {
-  if (typeof authInfo !== 'object' || authInfo === null) return undefined;
+  if (authInfo === null || typeof authInfo !== 'object') return undefined;
   const o = authInfo as Record<string, unknown>;
   const aud = o['aud'] ?? o['audience'];
   return typeof aud === 'string' || Array.isArray(aud) ? (aud as string | string[]) : undefined;
@@ -76,7 +76,7 @@ function audienceOf(authInfo: unknown): string | string[] | undefined {
 
 /** Reads the granted scopes (`scopes` array or space-delimited `scope`) from authInfo. */
 function scopesOf(authInfo: unknown): string[] {
-  if (typeof authInfo !== 'object' || authInfo === null) return [];
+  if (authInfo === null || typeof authInfo !== 'object') return [];
   const o = authInfo as Record<string, unknown>;
   if (Array.isArray(o['scopes'])) return (o['scopes'] as unknown[]).filter((s): s is string => typeof s === 'string');
   if (typeof o['scope'] === 'string') return o['scope'].split(/\s+/).filter(Boolean);

@@ -135,6 +135,8 @@
 
       // Receive messages from the host.
       window.addEventListener('message', (e) => {
+        // Only accept messages from the host (parent) window.
+        if (e.source !== window.parent) return;
         const msg = e.data;
         if (!msg || msg.target !== 'mcp-app') return;
         if (msg.type === 'set') {

@@ -297,8 +297,7 @@ for (const pg of PAGES) {
       // Skip wire-panel frame rows (expandable JSON) and the wire "Clear" control —
       // they aren't page capability actions and only add noise to the report.
       if (/^[→←↳↘↗↙]/.test(text) || /#\d+$/.test(text) || text === 'Clear') continue;
-      let disabled = false,
-        visible = true;
+      let disabled, visible;
       try {
         disabled = await b.isDisabled();
         visible = await b.isVisible();

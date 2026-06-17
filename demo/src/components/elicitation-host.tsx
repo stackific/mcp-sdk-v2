@@ -106,7 +106,16 @@ function FormElicitation({ p }: { p: PendingElicitation }) {
 function UrlElicitation({ p }: { p: PendingElicitation }) {
   useEffect(() => {
     const handler = async (e: MessageEvent) => {
+      // Verify the message comes from the elicitation window we opened (its URL's
+      // origin) before acting on it (CodeQL js/missing-origin-check).
+      let expectedOrigin: string;
+      try {
+        expectedOrigin = new URL(p.params.url).origin;
+      } catch {
+        return;
+      }
       if (
+        e.origin === expectedOrigin &&
         e.data?.source === 'mcp-url-elicitation' &&
         e.data.elicitationId === p.params.elicitationId
       ) {
