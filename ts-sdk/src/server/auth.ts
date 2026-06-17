@@ -5,7 +5,7 @@
  * builds the protected-resource metadata document. Edge-safe (no `node:*`).
  */
 import type { AuthGate } from './streamable-http.js';
-import { buildInsufficientScopeResponse } from '../protocol/authorization.js';
+import { buildInsufficientScopeResponse, stripTrailingSlashes } from '../protocol/authorization.js';
 
 /**
  * Returns `true` when a token's audience covers `resource` (§23.6). Inlined (rather
@@ -14,7 +14,7 @@ import { buildInsufficientScopeResponse } from '../protocol/authorization.js';
  * difference is tolerated; the comparison is otherwise exact (R-23.6-g).
  */
 function audienceCovers(tokenAudience: string | string[], resource: string): boolean {
-  const norm = (u: string): string => u.replace(/\/+$/, '');
+  const norm = (u: string): string => stripTrailingSlashes(u);
   const target = norm(resource);
   return (Array.isArray(tokenAudience) ? tokenAudience : [tokenAudience]).some((a) => norm(a) === target);
 }

@@ -510,7 +510,7 @@ describe('AC-35.22 PRM validation + AS selection (R-23.2-h/i/j)', () => {
     expect(v.ok).toBe(true);
     if (v.ok) {
       expect(selectAuthorizationServer(v.metadata)).toBe('https://auth1.example.com');
-      expect(selectAuthorizationServer(v.metadata, (i) => i.endsWith('auth2.example.com'))).toBe(
+      expect(selectAuthorizationServer(v.metadata, (i) => i === 'https://auth2.example.com')).toBe(
         'https://auth2.example.com',
       );
     }

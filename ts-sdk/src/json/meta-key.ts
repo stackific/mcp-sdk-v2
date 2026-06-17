@@ -224,9 +224,24 @@ function isValidBaggageMember(member: string): boolean {
  * Each list member must be `token "=" *baggage-octet` with optional properties.
  * (R-4.2-m, AC-05.15)
  */
+/** Trims optional whitespace (OWS = space/tab) from both ends in linear time. */
+function trimOws(member: string): string {
+  let start = 0;
+  let end = member.length;
+  while (start < end && (member.charCodeAt(start) === 0x20 || member.charCodeAt(start) === 0x09)) {
+    start++;
+  }
+  while (end > start && (member.charCodeAt(end - 1) === 0x20 || member.charCodeAt(end - 1) === 0x09)) {
+    end--;
+  }
+  return member.slice(start, end);
+}
+
 export function isValidBaggage(value: string): boolean {
   if (value.length === 0) return false;
-  const members = value.split(/[ \t]*,[ \t]*/);
+  // Split on commas, then strip per-member OWS linearly. A `/[ \t]*,[ \t]*/` split
+  // regex backtracks polynomially on long space/tab runs (CodeQL js/polynomial-redos).
+  const members = value.split(',').map(trimOws);
   return members.every(isValidBaggageMember);
 }
 

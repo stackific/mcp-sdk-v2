@@ -473,7 +473,7 @@ class TestProtectedResourceMetadata:
     assert v.ok is True
     assert select_authorization_server(v.metadata) == "https://auth1.example.com"
     assert (
-      select_authorization_server(v.metadata, lambda i: i.endswith("auth2.example.com"))
+      select_authorization_server(v.metadata, lambda i: i == "https://auth2.example.com")
       == "https://auth2.example.com"
     )
 

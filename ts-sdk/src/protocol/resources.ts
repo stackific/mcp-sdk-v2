@@ -289,7 +289,9 @@ export function uriTemplateVariables(template: string): string[] {
     let body = match[1]!;
     if (URI_TEMPLATE_OPERATOR.includes(body[0]!)) body = body.slice(1);
     for (const spec of body.split(',')) {
-      const name = spec.replace(/[*].*$/, '').replace(/:.*$/, '');
+      // Strip the explode (`*`) and prefix (`:N`) modifiers with linear string ops;
+      // `/[*].*$/`-style regexes are flagged for polynomial backtracking (CodeQL).
+      const name = spec.split('*')[0]!.split(':')[0]!;
       if (name.length > 0 && !seen.has(name)) {
         seen.add(name);
         names.push(name);
