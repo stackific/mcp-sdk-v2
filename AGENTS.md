@@ -15,3 +15,4 @@
 - Must write in-depth inline documentation in the code
 - Must write adequate tests to cover all scenarios including edge cases
 - Never cheat, bypass, omit tests to pass the tests whereas actual code fixes were needed
+- Never bypass the git hooks: do not pass `--no-verify`/`-n` to `git commit` or `git push`, and never set hook-skipping env vars (e.g. `LEFTHOOK=0`, `LEFTHOOK_EXCLUDE`, `HUSKY=0`, `SKIP=...`). The pre-push gate (secret scan, lint, format, build, test) MUST run and pass on every push

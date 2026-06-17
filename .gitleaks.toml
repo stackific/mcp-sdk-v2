@@ -1,0 +1,18 @@
+# gitleaks configuration for the pre-push secret scan (`task secrets`).
+#
+# Extends the default gitleaks ruleset, then allowlists paths that only ever
+# contain EXAMPLE OAuth tokens (not real secrets): the vendored MCP spec document
+# and the authorization test fixtures. These are deliberately-fake `access_token`
+# / `refresh_token` literals used to exercise the OAuth flows.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example OAuth tokens in the vendored spec + auth test fixtures (not real secrets)."
+paths = [
+  '''docs/model-context-protocol\.md''',
+  '''.*/__tests__/.*''',
+  '''.*/tests/.*''',
+  '''.*\.test\.(ts|tsx|js|mjs|cjs)$''',
+  '''.*/test_[^/]*\.py$''',
+]

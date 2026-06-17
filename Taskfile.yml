@@ -48,9 +48,18 @@ tasks:
     desc: Install the pre-push git hooks + dependencies for every stack (Node/pnpm, Python/uv, .NET)
     cmds:
       - task: setup:hooks
+      - task: setup:tools
       - task: setup:ts
       - task: setup:py
       - task: setup:csharp
+
+  setup:tools:
+    desc: Install local gate tools — GitHub CLI (gh) + gitleaks (secret scan) + CodeQL CLI (GHAS)
+    cmds:
+      - command -v gitleaks >/dev/null 2>&1 || brew install gitleaks
+      - command -v gh >/dev/null 2>&1 || brew install gh
+      - gh extension list 2>/dev/null | grep -q gh-codeql || gh extension install github/gh-codeql
+      - gh codeql version >/dev/null
 
   setup:hooks:
     desc: Install the lefthook-managed git hooks (pre-push quality gate)
@@ -324,6 +333,40 @@ tasks:
     desc: Run the full pre-push gate (lint → format → build → test) via lefthook
     cmds:
       - lefthook run pre-push --all-files
+
+  secrets:
+    desc: Scan tracked content for committed secrets (gitleaks; example tokens allowlisted in .gitleaks.toml)
+    cmds:
+      - gitleaks git . --no-banner --redact --config .gitleaks.toml
+
+  ghas:
+    desc: GitHub Advanced Security — local CodeQL security-and-quality scan for every language
+    cmds:
+      - mkdir -p .codeql
+      - task: ghas:ts
+      - task: ghas:py
+      - task: ghas:csharp
+
+  ghas:ts:
+    desc: CodeQL security-and-quality over the JS/TS sources
+    cmds:
+      - mkdir -p .codeql
+      - gh codeql database create .codeql/db-js --language=javascript-typescript --source-root=. --overwrite
+      - gh codeql database analyze .codeql/db-js --download --threads=0 --format=sarif-latest --output=.codeql/js.sarif codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls
+
+  ghas:py:
+    desc: CodeQL security-and-quality over the Python sources
+    cmds:
+      - mkdir -p .codeql
+      - gh codeql database create .codeql/db-py --language=python --source-root=. --overwrite
+      - gh codeql database analyze .codeql/db-py --download --threads=0 --format=sarif-latest --output=.codeql/py.sarif codeql/python-queries:codeql-suites/python-security-and-quality.qls
+
+  ghas:csharp:
+    desc: CodeQL security-and-quality over the C# sources (needs a dotnet build trace)
+    cmds:
+      - mkdir -p .codeql
+      - gh codeql database create .codeql/db-cs --language=csharp --command='dotnet build Stackific.Mcp.slnx --no-incremental /p:UseSharedCompilation=false' --source-root=. --overwrite
+      - gh codeql database analyze .codeql/db-cs --download --threads=0 --format=sarif-latest --output=.codeql/cs.sarif codeql/csharp-queries:codeql-suites/csharp-security-and-quality.qls
 
   lint:
     desc: Lint every stack (Prettier check for JS/TS, Ruff for Python, dotnet format --verify for C#)

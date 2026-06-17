@@ -1,4 +1,5 @@
 .worktrees
+.codeql
 
 node_modules
 dist

@@ -4,11 +4,27 @@
 #   task prepush   → run the whole pre-push gate on demand (`lefthook run pre-push --all-files`)
 #   git push       → the pre-push gate runs automatically
 #
-# The gate mirrors what CI enforces so a failing push is caught locally first:
-# lint → format → build → test, run in order and stopping at the first failure.
+# Hooks:
+#   commit-msg → conventional-commit subject + DCO sign-off (catches a missing sign-off locally)
+#   pre-commit → gitleaks secret scan of the staged diff (fast, staged-only)
+#   pre-push   → secrets → lint → format → build → test, in order, fail-fast on the first failure
+commit-msg:
+  commands:
+    conventional-dco:
+      run: bash scripts/check-commit-msg.sh {1}
+
+pre-commit:
+  commands:
+    # Secret scan of the staged diff (fast) — catch secrets at commit time, before push.
+    secrets-staged:
+      run: gitleaks protect --staged --no-banner --redact --config .gitleaks.toml
+
 pre-push:
   piped: true
   commands:
+    # Secret scan over tracked content (gitleaks; example tokens allowlisted in .gitleaks.toml).
+    0_secrets:
+      run: task secrets
     # Static analysis / dead-import detection (ruff over the Python stacks).
     1_lint:
       run: task lint
