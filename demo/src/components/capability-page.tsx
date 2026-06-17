@@ -1,6 +1,10 @@
 import { type ReactNode } from 'react';
 
+import { useLocation } from '@tanstack/react-router';
+
 import { type Frame } from '@/lib/debug';
+import { getLanguage } from '@/lib/languages';
+import { patternDocUrl } from '@/lib/patterns';
 
 import { Badge } from './ui/badge';
 import { WireDebug } from './wire-debug';
@@ -23,6 +27,10 @@ export function CapabilityPage({
   /** When set, marks the feature Deprecated (§27.3); a string is shown as the migration note. */
   deprecated?: boolean | string;
 }) {
+  // Link this page to its implementation pattern doc for the currently selected language stack.
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const docUrl = patternDocUrl(pathname);
+  const language = getLanguage();
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-4 shrink-0">
@@ -40,6 +48,17 @@ export function CapabilityPage({
             ⚠ Deprecated (§27.3): {deprecated} It stays fully functional and behaves exactly as
             specified until removed; new implementations SHOULD NOT adopt it.
           </p>
+        ) : null}
+        {docUrl ? (
+          <a
+            href={docUrl}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="pattern-doc-link"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300"
+          >
+            View the {language.label} implementation pattern ↗
+          </a>
         ) : null}
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
