@@ -493,10 +493,7 @@ public sealed class OffsetPaginator<T>
     // Only a run of ASCII digits is a recognized token (matches the TS /^\d+$/ guard; "" and "-1"
     // are rejected). An in-range value in [0, items.Length] is valid.
     if (cursor.Length == 0) return null;
-    foreach (var ch in cursor)
-    {
-      if (ch is < '0' or > '9') return null;
-    }
+    if (cursor.Any(ch => ch is < '0' or > '9')) return null;
     if (!int.TryParse(cursor, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n))
     {
       return null;

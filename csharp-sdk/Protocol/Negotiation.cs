@@ -65,14 +65,7 @@ public static class RevisionNegotiation
     ArgumentNullException.ThrowIfNull(supportedVersions);
     var preference = clientAcceptable ?? [ProtocolRevision.Current];
     var offered = new HashSet<string>(supportedVersions, StringComparer.Ordinal);
-    foreach (var candidate in preference)
-    {
-      if (offered.Contains(candidate))
-      {
-        return candidate;
-      }
-    }
-    return null;
+    return preference.FirstOrDefault(offered.Contains);
   }
 
   /// <summary>
@@ -186,9 +179,9 @@ public static class RevisionNegotiation
     }
 
     // Success branch: a result carrying a valid DiscoverResult.
-    if (obj.ContainsKey("result") && !obj.ContainsKey("error"))
+    if (obj.TryGetPropertyValue("result", out var resultNode) && !obj.ContainsKey("error"))
     {
-      if (obj["result"] is JsonObject resultObj && TryReadDiscoverResult(resultObj, out var supportedVersions, out var result))
+      if (resultNode is JsonObject resultObj && TryReadDiscoverResult(resultObj, out var supportedVersions, out var result))
       {
         return new ProbeOutcome.Supported([.. supportedVersions], result);
       }
@@ -261,15 +254,10 @@ public static class RevisionNegotiation
   {
     if (container is JsonObject obj && obj[key] is JsonArray array)
     {
-      var list = new List<string>(array.Count);
-      foreach (var element in array)
-      {
-        if (element is JsonValue value && value.GetValueKind() == JsonValueKind.String)
-        {
-          list.Add(value.GetValue<string>());
-        }
-      }
-      return list;
+      return array
+        .Where(element => element is JsonValue value && value.GetValueKind() == JsonValueKind.String)
+        .Select(element => element!.GetValue<string>())
+        .ToList();
     }
     return [];
   }

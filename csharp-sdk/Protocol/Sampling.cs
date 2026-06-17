@@ -530,13 +530,10 @@ public static class SamplingValidation
   {
     ArgumentNullException.ThrowIfNull(availableModels);
     if (hints is null) return null;
-    foreach (var hint in hints)
+    foreach (var hint in hints.Where(hint => hint.Name is not null))
     {
-      if (hint.Name is not { } needle) continue;
-      foreach (var model in availableModels)
-      {
-        if (model.Contains(needle, StringComparison.Ordinal)) return new ModelHintMatch(hint, model);
-      }
+      var model = availableModels.FirstOrDefault(m => m.Contains(hint.Name!, StringComparison.Ordinal));
+      if (model is not null) return new ModelHintMatch(hint, model);
     }
     return null;
   }
@@ -735,13 +732,11 @@ public static class SamplingValidation
       }
       var resultIds = new HashSet<string>(nextBlocks.OfType<ToolResultContent>().Select(b => b.ToolUseId), StringComparer.Ordinal);
       // Each tool use must be matched by a corresponding tool result. (R-21.2.7-b, R-21.2.6-d)
-      foreach (var id in useIds)
+      var unmatched = useIds.FirstOrDefault(id => !resultIds.Contains(id));
+      if (unmatched is not null)
       {
-        if (!resultIds.Contains(id))
-        {
-          return MessageValidationResult.Fail(
-            $"tool_use id \"{id}\" has no matching tool_result toolUseId (R-21.2.7-b, R-21.2.6-d)", i + 1);
-        }
+        return MessageValidationResult.Fail(
+          $"tool_use id \"{unmatched}\" has no matching tool_result toolUseId (R-21.2.7-b, R-21.2.6-d)", i + 1);
       }
     }
     return MessageValidationResult.Pass;

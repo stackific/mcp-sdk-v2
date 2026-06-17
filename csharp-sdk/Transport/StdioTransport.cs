@@ -256,11 +256,10 @@ public abstract class StdioEndpoint : IByteChannelTransport
   /// <param name="chunk">The newly received bytes.</param>
   protected void AcceptBytes(ReadOnlySpan<byte> chunk)
   {
-    foreach (var unit in _decoder.Push(chunk))
+    // An empty or whitespace-only line is not a message: ignore it rather than treating it as
+    // malformed (R-8.2-h).
+    foreach (var unit in _decoder.Push(chunk).Where(unit => !IsBlankLine(unit)))
     {
-      // An empty or whitespace-only line is not a message: ignore it rather than treating it as
-      // malformed (R-8.2-h).
-      if (IsBlankLine(unit)) continue;
       // A receiver SHOULD tolerate a preceding \r (a \r\n terminator) and strip it before parsing
       // (R-8.2-f, R-8.2-g).
       var line = StripTrailingCarriageReturn(unit);

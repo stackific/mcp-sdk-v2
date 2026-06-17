@@ -94,7 +94,7 @@ public static class JsonRpcMessageSerializer
 
     var hasId = obj.TryGetPropertyValue("id", out var idNode) && idNode is not null;
     var hasMethod = obj.TryGetPropertyValue("method", out var methodNode);
-    var hasResult = obj.ContainsKey("result");
+    var hasResult = obj.TryGetPropertyValue("result", out var resultNode);
     var hasError = obj.TryGetPropertyValue("error", out var errorNode) && errorNode is not null;
 
     // §3.1: method together with result/error, or both result and error, is malformed.
@@ -129,7 +129,7 @@ public static class JsonRpcMessageSerializer
     if (hasResult)
     {
       if (!hasId) throw McpError.InvalidRequest("A success response MUST carry an \"id\".");
-      if (obj["result"] is not JsonObject result)
+      if (resultNode is not JsonObject result)
       {
         throw McpError.InvalidRequest("\"result\" MUST be a JSON object (a Result; see §3.6).");
       }

@@ -163,17 +163,9 @@ public static class JsonValues
         // JSON null.
         return true;
       case JsonObject obj:
-        foreach (var member in obj)
-        {
-          if (!IsJsonValue(member.Value)) return false;
-        }
-        return true;
+        return obj.All(member => IsJsonValue(member.Value));
       case JsonArray array:
-        foreach (var element in array)
-        {
-          if (!IsJsonValue(element)) return false;
-        }
-        return true;
+        return array.All(IsJsonValue);
       case JsonValue scalar:
         // A scalar is a valid JSON value only when it maps to one of the JSON value kinds
         // (string, number, true, false, null). Anything else is not a JSON value.

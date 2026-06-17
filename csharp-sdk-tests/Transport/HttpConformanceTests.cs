@@ -364,16 +364,13 @@ public sealed class HttpConformanceTests : IAsyncLifetime
   /// <summary>Reads the raw SSE body and returns each <c>data:</c> payload as a parsed JSON object.</summary>
   private static async Task<List<JsonObject>> ReadSseEventsAsync(HttpResponseMessage response)
   {
-    var events = new List<JsonObject>();
     var text = await response.Content.ReadAsStringAsync();
-    foreach (var line in text.Split('\n'))
-    {
-      if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
-      var payload = line.Length > 5 && line[5] == ' ' ? line[6..] : line[5..];
-      if (payload.Length == 0) continue;
-      events.Add(JsonNode.Parse(payload)!.AsObject());
-    }
-    return events;
+    return text.Split('\n')
+      .Where(line => line.StartsWith("data:", StringComparison.Ordinal))
+      .Select(line => line.Length > 5 && line[5] == ' ' ? line[6..] : line[5..])
+      .Where(payload => payload.Length > 0)
+      .Select(payload => JsonNode.Parse(payload)!.AsObject())
+      .ToList();
   }
 
   private async Task<HttpResponseMessage> PostWithProgressTokenAsync(string toolName, JsonObject arguments, string token)

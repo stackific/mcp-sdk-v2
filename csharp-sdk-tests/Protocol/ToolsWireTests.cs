@@ -344,13 +344,13 @@ public sealed class ToolsWireTests
 
   public static IEnumerable<object[]> StructuredContentCases() =>
   [
-    [(JsonNode)new JsonObject { ["tempC"] = 21 }, "\"structuredContent\":{\"tempC\":21}"],
-    [(JsonNode)new JsonArray(1, 2, 3), "\"structuredContent\":[1,2,3]"],
-    [(JsonNode)JsonValue.Create("text"), "\"structuredContent\":\"text\""],
-    [(JsonNode)JsonValue.Create(42), "\"structuredContent\":42"],
-    [(JsonNode)JsonValue.Create(3.5), "\"structuredContent\":3.5"],
-    [(JsonNode)JsonValue.Create(true), "\"structuredContent\":true"],
-    [(JsonNode)JsonValue.Create(false), "\"structuredContent\":false"],
+    [new JsonObject { ["tempC"] = 21 }, "\"structuredContent\":{\"tempC\":21}"],
+    [new JsonArray(1, 2, 3), "\"structuredContent\":[1,2,3]"],
+    [JsonValue.Create("text"), "\"structuredContent\":\"text\""],
+    [JsonValue.Create(42), "\"structuredContent\":42"],
+    [JsonValue.Create(3.5), "\"structuredContent\":3.5"],
+    [JsonValue.Create(true), "\"structuredContent\":true"],
+    [JsonValue.Create(false), "\"structuredContent\":false"],
   ];
 
   [Theory]

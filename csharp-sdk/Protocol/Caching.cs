@@ -249,11 +249,7 @@ public static class Caching
     ArgumentNullException.ThrowIfNull(scopes);
     if (scopes.Count == 0) return true;
     var first = scopes[0];
-    foreach (var s in scopes)
-    {
-      if (!string.Equals(s, first, StringComparison.Ordinal)) return false;
-    }
-    return true;
+    return scopes.All(s => string.Equals(s, first, StringComparison.Ordinal));
   }
 
   /// <summary>
@@ -375,11 +371,9 @@ public sealed class ResponseCache<T>
     foreach (var method in Caching.MethodsForNotification(notification))
     {
       var prefix = $"{method}::";
-      var toRemove = new List<string>();
-      foreach (var key in _store.Keys)
-      {
-        if (key == method || key.StartsWith(prefix, StringComparison.Ordinal)) toRemove.Add(key);
-      }
+      var toRemove = _store.Keys
+        .Where(key => key == method || key.StartsWith(prefix, StringComparison.Ordinal))
+        .ToList();
       foreach (var key in toRemove) _store.Remove(key);
     }
   }

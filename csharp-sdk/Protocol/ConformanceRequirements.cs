@@ -954,13 +954,10 @@ public static partial class ConformanceRequirements
         "revisions", $"Advertised revisions must include the wire value \"{ProtocolRevision.Current}\" (R-29.9-c)."));
     }
 
-    foreach (var extension in profile.Extensions)
+    foreach (var extension in profile.Extensions.Where(extension => !Extensions.IsValidId(extension)))
     {
-      if (!Extensions.IsValidId(extension))
-      {
-        violations.Add(new ConformanceProfileViolation(
-          "extensions", $"Extension identifier \"{extension}\" is not well-formed per §6 (R-29.5-c)."));
-      }
+      violations.Add(new ConformanceProfileViolation(
+        "extensions", $"Extension identifier \"{extension}\" is not well-formed per §6 (R-29.5-c)."));
     }
 
     if (profile.Transports.Count == 0)
@@ -1007,21 +1004,13 @@ public static partial class ConformanceRequirements
     ArgumentNullException.ThrowIfNull(profile);
     var roleSet = new HashSet<Role>(profile.Roles);
     var advertised = new HashSet<string>(profile.Capabilities, StringComparer.Ordinal);
-    var result = new List<ConformanceRequirement>();
-    foreach (var r in All)
-    {
+    var applicable = All.Where(r =>
       // Role-axis: applies only when the implementation plays a bound role.
-      if (r.Roles.Count > 0 && !r.Roles.Any(roleSet.Contains)) continue;
-
+      (r.Roles.Count == 0 || r.Roles.Any(roleSet.Contains)) &&
       // §29.4 capability-conditioned feature atoms apply only when advertised.
-      if (r.Section == "29.4" && CapabilityGuard.TryGetValue(r.Id, out var guardedCapability) &&
-          !advertised.Contains(guardedCapability))
-      {
-        continue;
-      }
-      result.Add(r);
-    }
-    return result;
+      !(r.Section == "29.4" && CapabilityGuard.TryGetValue(r.Id, out var guardedCapability) &&
+        !advertised.Contains(guardedCapability)));
+    return applicable.ToList();
   }
 
   /// <summary>

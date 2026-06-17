@@ -132,10 +132,7 @@ public static class UriTemplate
         if (body.Length == 0) return false; // operator with no variables
       }
 
-      foreach (var spec in body.Split(','))
-      {
-        if (!IsValidVarspec(spec)) return false;
-      }
+      if (!body.Split(',').All(IsValidVarspec)) return false;
 
       i = close + 1;
     }

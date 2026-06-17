@@ -423,16 +423,8 @@ public static class ParamHeaders
     {
       return true; // pure-ASCII sentinel form is always safe
     }
-    foreach (var rune in value.EnumerateRunes())
-    {
-      var c = rune.Value;
-      var safe = c == 0x09 || (c >= 0x20 && c <= 0x7e);
-      if (!safe)
-      {
-        return false;
-      }
-    }
-    return true;
+    return value.EnumerateRunes().All(rune =>
+      rune.Value == 0x09 || (rune.Value >= 0x20 && rune.Value <= 0x7e));
   }
 
   /// <summary>Compares a decoded header value to a body value, numerically for integers. (R-9.5.4-c/d)</summary>

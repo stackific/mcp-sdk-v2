@@ -221,7 +221,8 @@ public sealed class StreamableHttpClientTransport : ClientTransport
     {
       return;
     }
-    var arguments = prms?["arguments"] as JsonObject;
+    // A non-null toolName came from prms?["name"], so prms itself is non-null here.
+    var arguments = prms!["arguments"] as JsonObject;
     foreach (var (headerName, headerValue) in ParamHeaders.BuildParamHeaders(inputSchema, arguments))
     {
       httpRequest.Headers.TryAddWithoutValidation(headerName, headerValue);

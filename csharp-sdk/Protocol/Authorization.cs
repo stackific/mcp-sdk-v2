@@ -686,13 +686,7 @@ public sealed record ProtectedResourceMetadata
     }
     if (prefer is not null)
     {
-      foreach (var issuer in AuthorizationServers)
-      {
-        if (prefer(issuer))
-        {
-          return issuer;
-        }
-      }
+      return AuthorizationServers.FirstOrDefault(prefer) ?? AuthorizationServers[0];
     }
     return AuthorizationServers[0];
   }

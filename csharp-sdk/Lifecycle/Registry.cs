@@ -76,14 +76,7 @@ public static class DeprecatedRegistry
   public static DeprecatedRegistryEntry? Find(string feature)
   {
     ArgumentNullException.ThrowIfNull(feature);
-    foreach (var entry in Entries)
-    {
-      if (string.Equals(entry.Feature, feature, StringComparison.Ordinal))
-      {
-        return entry;
-      }
-    }
-    return null;
+    return Entries.FirstOrDefault(entry => string.Equals(entry.Feature, feature, StringComparison.Ordinal));
   }
 
   /// <summary>

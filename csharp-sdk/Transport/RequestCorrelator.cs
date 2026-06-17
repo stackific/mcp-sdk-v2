@@ -297,13 +297,11 @@ public static class MalformedIdError
       return false;
     }
     // id, when present, must be a string, a number, or null (the relaxed rule).
-    if (obj.TryGetPropertyValue("id", out var idNode) && idNode is not null)
+    if (obj.TryGetPropertyValue("id", out var idNode) && idNode is not null &&
+        (idNode is not JsonValue idValue ||
+         (idValue.GetValueKind() != JsonValueKind.String && idValue.GetValueKind() != JsonValueKind.Number)))
     {
-      if (idNode is not JsonValue idValue ||
-          (idValue.GetValueKind() != JsonValueKind.String && idValue.GetValueKind() != JsonValueKind.Number))
-      {
-        return false;
-      }
+      return false;
     }
     // error must be an object with an integer code and a string message.
     if (obj["error"] is not JsonObject error)

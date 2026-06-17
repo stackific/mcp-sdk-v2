@@ -115,14 +115,12 @@ public static partial class IconSecurity
         continue;
       }
 
-      if (mimeType == "image/webp")
+      // The RIFF container header is shared by several formats; only a WEBP tag at offset 8
+      // confirms a WebP image.
+      if (mimeType == "image/webp" &&
+          (bytes.Length < 8 + WebpTag.Length || !bytes.Slice(8, WebpTag.Length).SequenceEqual(WebpTag)))
       {
-        // The RIFF container header is shared by several formats; only a WEBP tag at offset 8
-        // confirms a WebP image.
-        if (bytes.Length < 8 + WebpTag.Length || !bytes.Slice(8, WebpTag.Length).SequenceEqual(WebpTag))
-        {
-          continue;
-        }
+        continue;
       }
 
       return mimeType;
@@ -244,9 +242,8 @@ public static partial class IconSecurity
 
     Icon? best = null;
     (int ThemeRank, int FitScore) bestKey = default;
-    foreach (var icon in icons)
+    foreach (var icon in icons.Where(icon => IsValidIconSrc(icon.Src)))
     {
-      if (!IsValidIconSrc(icon.Src)) continue;
       var key = (ThemeRank: ThemeRank(icon.Theme, theme), FitScore: BestFitScore(icon.Sizes, desiredSizePx));
       if (best is null || key.CompareTo(bestKey) > 0)
       {

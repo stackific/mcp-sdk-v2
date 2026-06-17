@@ -296,8 +296,8 @@ public static class Payload
   private static bool MetaIsAbsentOrObject(JsonObject obj)
   {
     // The key being absent is acceptable for an optional _meta.
-    if (!obj.ContainsKey("_meta")) return true;
+    if (!obj.TryGetPropertyValue("_meta", out var meta)) return true;
     // The key being present requires an object value (a present null/scalar/array is rejected).
-    return obj["_meta"] is JsonObject;
+    return meta is JsonObject;
   }
 }

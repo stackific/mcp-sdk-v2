@@ -63,7 +63,7 @@ public sealed class ExtensionsTests
     var parsed = Extensions.ParseId("com.example/");
     Assert.NotNull(parsed);
     Assert.Equal("com.example", parsed!.Value.Prefix);
-    Assert.Equal("", parsed.Value.Name);
+    Assert.Equal("", parsed!.Value.Name);
     Assert.True(Extensions.IsValidId("com.example/"));
     // A second slash lands inside the name and makes the id invalid.
     Assert.False(Extensions.IsValidId("com.example/a/b"));
@@ -489,7 +489,7 @@ public sealed class ExtensionsTests
     var r = Extensions.ReconcileSettings(client, server, "com.example/x");
     Assert.NotNull(r);
     Assert.True(r!.Value.Client.ContainsKey("mimeTypes"));
-    Assert.True(r.Value.Server.ContainsKey("mimeTypes"));
+    Assert.True(r!.Value.Server.ContainsKey("mimeTypes"));
     Assert.Null(Extensions.ReconcileSettings(Map("""{"com.example/x":{}}"""), Map("{}"), "com.example/x"));
   }
 

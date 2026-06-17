@@ -170,7 +170,7 @@ public static class AuthFlow
       tokenMasked = Mask(tokenResponse.AccessToken),
       scope = tokenResponse.Scope,
       authInfo,
-      whoami = (JsonNode?)whoami.DeepClone(),
+      whoami = whoami.DeepClone(),
     };
   }
 
