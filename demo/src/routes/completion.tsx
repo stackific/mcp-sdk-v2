@@ -59,17 +59,17 @@ export function CompletionPage() {
           </Button>
           <div className="flex flex-wrap gap-2" data-testid="completion-values">
             {values.length === 0 ? (
-              <span className="text-xs text-slate-500">No suggestions.</span>
+              <span className="text-xs text-muted-foreground">No suggestions.</span>
             ) : (
               values.map((v) => (
-                <Badge key={v} variant="blue" data-testid="completion-value">
+                <Badge key={v} variant="outline" data-testid="completion-value">
                   {v}
                 </Badge>
               ))
             )}
           </div>
           {!complete.data?.ok && complete.data ? (
-            <p className="text-xs text-red-300">{complete.data.error.message}</p>
+            <p className="text-xs text-destructive">{complete.data.error.message}</p>
           ) : null}
         </CardContent>
       </Card>

@@ -39,14 +39,14 @@ export function ExtensionsPage() {
           {s ? (
             hasExtensions ? (
               <div className="space-y-2">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   Server <span className="font-mono">extensions</span> map:
                 </p>
                 <JsonBlock value={extensions} />
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   The server advertises no <span className="font-mono">extensions</span> map. Below
                   is the extension-bearing capability the server does negotiate (Tasks).
                 </p>
@@ -60,7 +60,7 @@ export function ExtensionsPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Extensions let the protocol grow through opt-in, independently versioned additions that
             never break older peers.

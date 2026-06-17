@@ -52,14 +52,14 @@ export function TracingPage() {
 
           {traceparent ? (
             <div className="space-y-1 text-xs">
-              <div className="text-slate-400">sent traceparent:</div>
-              <div className="font-mono text-slate-300">{traceparent}</div>
+              <div className="text-muted-foreground">sent traceparent:</div>
+              <div className="font-mono text-muted-foreground">{traceparent}</div>
             </div>
           ) : null}
 
           {echoed ? (
             <div className="space-y-1">
-              <div className="text-xs text-slate-400" data-testid="trace-roundtrip">
+              <div className="text-xs text-muted-foreground" data-testid="trace-roundtrip">
                 {roundTripped
                   ? '✓ round-trip confirmed — server received the same traceparent'
                   : 'server _meta:'}

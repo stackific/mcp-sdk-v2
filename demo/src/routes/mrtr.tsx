@@ -50,7 +50,7 @@ export function MrtrPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             One client request can spawn nested server-to-client requests on the same stream. The
             server never opens an independent request: it returns an <code>"input_required"</code>{' '}

@@ -1,6 +1,143 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/instrument-sans';
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Theme tokens (shadcn). `:root` is the light theme; `.dark` — applied to <html>
+ * by default before first paint (see index.html) and toggled by the sidebar
+ * switch — is the dark theme. Tailwind v4 turns each token into a utility through
+ * the `@theme inline` map below (e.g. `--primary` → `bg-primary`/`text-primary`),
+ * so components style against semantic tokens instead of raw palette shades.
+ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.555 0.163 48.998);
+  --primary-foreground: oklch(0.987 0.022 95.277);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.828 0.111 230.318);
+  --chart-2: oklch(0.685 0.169 237.323);
+  --chart-3: oklch(0.588 0.158 241.966);
+  --chart-4: oklch(0.5 0.134 242.749);
+  --chart-5: oklch(0.443 0.11 240.79);
+  --radius: 0.45rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.666 0.179 58.318);
+  --sidebar-primary-foreground: oklch(0.987 0.022 95.277);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.473 0.137 46.201);
+  --primary-foreground: oklch(0.987 0.022 95.277);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.828 0.111 230.318);
+  --chart-2: oklch(0.685 0.169 237.323);
+  --chart-3: oklch(0.588 0.158 241.966);
+  --chart-4: oklch(0.5 0.134 242.749);
+  --chart-5: oklch(0.443 0.11 240.79);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.769 0.188 70.08);
+  --sidebar-primary-foreground: oklch(0.279 0.077 45.635);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Expose every token as a Tailwind v4 utility (bg-*, text-*, border-*, ring-*). */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: 'Geist Variable', sans-serif;
+  --font-heading: 'Instrument Sans Variable', sans-serif;
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
 
 html,
 body,
@@ -10,8 +147,6 @@ body,
 
 body {
   margin: 0;
-  background: #060914;
-  color: #e6e9f5;
   font-family:
     ui-sans-serif,
     system-ui,
@@ -24,68 +159,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/*
- * Light theme. The UI is built dark-first on a symmetric `slate` scale (dark
- * surfaces = slate-950/900, light text = slate-100/200). Rather than add `dark:`
- * variants to ~39 files, light mode (the absence of `.dark`) remaps the slate
- * scale to its mirror so every literal `slate-*` utility flips, plus darkens the
- * "light text" accent shades (200/300/400) and flips the dark error surface so
- * faint-tint badges/errors stay legible on a light background. Solid accent
- * backgrounds, /15 tints, and rings are unchanged.
- */
-html:not(.dark) {
-  /* slate scale, inverted (950 ↔ 50, 900 ↔ 100, …, 500 fixed) */
-  --color-slate-50: #020617;
-  --color-slate-100: #0f172a;
-  --color-slate-200: #1e293b;
-  --color-slate-300: #334155;
-  --color-slate-400: #475569;
-  --color-slate-500: #64748b;
-  --color-slate-600: #94a3b8;
-  --color-slate-700: #cbd5e1;
-  --color-slate-800: #e2e8f0;
-  --color-slate-900: #f1f5f9;
-  --color-slate-950: #f8fafc;
-
-  /* accent "light text" shades → darken for contrast on a light surface */
-  --color-blue-200: #1e40af;
-  --color-blue-300: #1d4ed8;
-  --color-blue-400: #2563eb;
-  --color-emerald-300: #047857;
-  --color-emerald-400: #059669;
-  --color-amber-300: #b45309;
-  --color-amber-400: #d97706;
-  --color-red-200: #991b1b;
-  --color-red-300: #b91c1c;
-  --color-red-400: #dc2626;
-
-  /* dark error-box surface → light red tint + border */
-  --color-red-900: #fecaca;
-  --color-red-950: #fee2e2;
-}
-
-html:not(.dark) body {
-  background: #f6f8fc;
-  color: #0f172a;
-}
-
-html:not(.dark) * {
-  scrollbar-color: #c2ccde transparent;
-}
-html:not(.dark) *::-webkit-scrollbar-thumb {
-  background: #c2ccde;
-}
-
-/* Thin scrollbars for the wire-debug panels. */
+/* Thin, theme-aware scrollbars for the wire-debug panels. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3354 transparent;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a3354;
+  background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
   border-radius: 8px;
 }

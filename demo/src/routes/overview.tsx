@@ -47,20 +47,22 @@ function LanguageSelector() {
                 className={cn(
                   'flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors',
                   active
-                    ? 'border-blue-500/60 bg-blue-600/15 ring-1 ring-inset ring-blue-500/40'
-                    : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-800/40',
+                    ? 'border-primary/60 bg-primary/15 ring-1 ring-inset ring-primary/40'
+                    : 'border-border bg-card/40 hover:border-border hover:bg-accent',
                 )}
               >
                 <div className="flex w-full items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-100">{lang.label}</span>
+                  <span className="text-sm font-semibold text-card-foreground">{lang.label}</span>
                   {active ? (
-                    <Badge variant="blue">selected</Badge>
+                    <Badge variant="outline">selected</Badge>
                   ) : lang.status === 'preview' ? (
-                    <Badge variant="slate">preview</Badge>
+                    <Badge variant="ghost">preview</Badge>
                   ) : null}
                 </div>
-                <span className="text-xs text-slate-400">{lang.tagline}</span>
-                <span className="font-mono text-[10px] text-slate-500">{lang.clientUrl}</span>
+                <span className="text-xs text-muted-foreground">{lang.tagline}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {lang.clientUrl}
+                </span>
               </button>
             );
           })}
@@ -104,17 +106,17 @@ export function OverviewPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={status.connected ? 'green' : 'slate'}>
+            <Badge variant={status.connected ? 'secondary' : 'ghost'}>
               {status.connected ? 'connected' : 'connecting…'}
             </Badge>
             {status.negotiatedVersion ? (
-              <Badge variant="blue">protocol {status.negotiatedVersion}</Badge>
+              <Badge variant="outline">protocol {status.negotiatedVersion}</Badge>
             ) : null}
             {status.serverInfo?.name ? (
-              <Badge variant="slate">{status.serverInfo.name}</Badge>
+              <Badge variant="ghost">{status.serverInfo.name}</Badge>
             ) : null}
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             This client speaks <span className="font-mono">2026-07-28</span> — a stateless,
             handshake-less revision. The negotiated version is established by{' '}
             <span className="font-mono">server/discover</span> (below), not by an initialize

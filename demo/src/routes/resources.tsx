@@ -47,7 +47,7 @@ export function ResourcesPage() {
                 key={r.uri}
                 type="button"
                 onClick={() => setUri(r.uri)}
-                className="rounded-md border border-slate-700 px-2 py-1 font-mono text-xs text-slate-200 hover:bg-slate-800"
+                className="rounded-md border border-border px-2 py-1 font-mono text-xs text-card-foreground hover:bg-accent"
               >
                 {r.name ?? r.uri}
               </button>

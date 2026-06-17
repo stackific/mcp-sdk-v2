@@ -24,12 +24,12 @@ export function AuthorizationPage() {
 
   const statusVariant = (s: number | string) =>
     s === 401
-      ? 'amber'
+      ? 'destructive'
       : typeof s === 'number' && s >= 200 && s < 300
-        ? 'green'
+        ? 'secondary'
         : s === 201
-          ? 'green'
-          : 'slate';
+          ? 'secondary'
+          : 'ghost';
 
   return (
     <CapabilityPage
@@ -57,16 +57,16 @@ export function AuthorizationPage() {
           {steps.length > 0 ? (
             <ol className="space-y-2" data-testid="auth-steps">
               {steps.map((s) => (
-                <li key={s.n} className="rounded-md border border-slate-800 bg-slate-900/40 p-2">
+                <li key={s.n} className="rounded-md border border-border bg-card/40 p-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-slate-200">
-                      <span className="text-slate-500">{s.n}.</span> {s.title}
+                    <span className="text-sm text-card-foreground">
+                      <span className="text-muted-foreground">{s.n}.</span> {s.title}
                     </span>
                     <Badge variant={statusVariant(s.status) as any}>
                       {s.method} {s.status}
                     </Badge>
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-slate-500">
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
                     {s.url}
                   </div>
                 </li>
@@ -76,15 +76,15 @@ export function AuthorizationPage() {
 
           {data?.tokenMasked ? (
             <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="auth-token">
-              <span className="text-slate-400">access token:</span>
+              <span className="text-muted-foreground">access token:</span>
               <span className="font-mono text-emerald-300">{data.tokenMasked}</span>
-              {data.scope ? <Badge variant="blue">scope: {data.scope}</Badge> : null}
+              {data.scope ? <Badge variant="outline">scope: {data.scope}</Badge> : null}
             </div>
           ) : null}
 
           {data?.authInfo ? (
             <div className="space-y-1">
-              <div className="text-xs text-slate-400" data-testid="auth-identity">
+              <div className="text-xs text-muted-foreground" data-testid="auth-identity">
                 server-validated identity (ctx.http.authInfo):
               </div>
               <JsonBlock value={data.authInfo} />

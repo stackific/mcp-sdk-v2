@@ -77,7 +77,7 @@ export function AppsPage() {
 
           {html ? (
             <div
-              className="overflow-hidden rounded-md border border-slate-800"
+              className="overflow-hidden rounded-md border border-border"
               data-testid="app-frame"
             >
               <iframe
@@ -85,7 +85,7 @@ export function AppsPage() {
                 title="MCP App: counter"
                 srcDoc={html}
                 sandbox="allow-scripts"
-                className="h-[320px] w-full bg-slate-950"
+                className="h-[320px] w-full bg-background"
               />
             </div>
           ) : null}
@@ -112,10 +112,10 @@ export function AppsPage() {
 
           {log.length > 0 ? (
             <div
-              className="rounded-md border border-slate-800 bg-slate-900/40 p-2 text-xs"
+              className="rounded-md border border-border bg-card/40 p-2 text-xs"
               data-testid="app-bridge-log"
             >
-              <div className="mb-1 text-slate-500">postMessage bridge</div>
+              <div className="mb-1 text-muted-foreground">postMessage bridge</div>
               <ul className="space-y-0.5 font-mono">
                 {log.slice(-8).map((e, i) => (
                   <li key={i} className={e.dir === 'in' ? 'text-emerald-300' : 'text-blue-300'}>

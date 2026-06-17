@@ -20,14 +20,17 @@ export function ApiResultView({
     );
   }
   return (
-    <div className="rounded-md border border-red-900 bg-red-950/40 p-3" data-testid="result-error">
-      <div className="text-sm font-semibold text-red-300">
+    <div
+      className="rounded-md border border-destructive/40 bg-destructive/10 p-3"
+      data-testid="result-error"
+    >
+      <div className="text-sm font-semibold text-destructive">
         Protocol error{' '}
         {result.error.code != null ? (
           <span className="font-mono">({result.error.code})</span>
         ) : null}
       </div>
-      <div className="text-sm text-red-200">{result.error.message}</div>
+      <div className="text-sm text-destructive">{result.error.message}</div>
       {result.error.data != null ? <JsonBlock value={result.error.data} className="mt-2" /> : null}
     </div>
   );

@@ -43,13 +43,13 @@ function FormElicitation({ p }: { p: PendingElicitation }) {
 
   return (
     <div>
-      <p className="mb-3 text-sm text-slate-300">{p.params.message}</p>
+      <p className="mb-3 text-sm text-muted-foreground">{p.params.message}</p>
       <div className="space-y-3">
         {Object.entries(props).map(([name, sch]) => (
           <div key={name}>
             <Label htmlFor={`elicit-${name}`}>
               {sch.title ?? name}
-              {required.includes(name) ? <span className="text-red-400"> *</span> : null}
+              {required.includes(name) ? <span className="text-destructive"> *</span> : null}
             </Label>
             {sch.type === 'boolean' ? (
               <div className="mt-1">
@@ -58,7 +58,7 @@ function FormElicitation({ p }: { p: PendingElicitation }) {
                   type="checkbox"
                   checked={!!values[name]}
                   onChange={(e) => set(name, e.target.checked)}
-                  className="h-4 w-4 accent-blue-500"
+                  className="h-4 w-4 accent-primary"
                 />
               </div>
             ) : sch.enum ? (
@@ -66,7 +66,7 @@ function FormElicitation({ p }: { p: PendingElicitation }) {
                 id={`elicit-${name}`}
                 value={values[name] ?? ''}
                 onChange={(e) => set(name, e.target.value)}
-                className="mt-1 flex h-9 w-full rounded-md border border-slate-700 bg-slate-950/50 px-2 text-sm text-slate-100"
+                className="mt-1 flex h-9 w-full rounded-md border border-border bg-background/50 px-2 text-sm text-foreground"
               >
                 <option value="">—</option>
                 {sch.enum.map((o: string) => (
@@ -120,8 +120,8 @@ function UrlElicitation({ p }: { p: PendingElicitation }) {
 
   return (
     <div>
-      <p className="mb-3 text-sm text-slate-300">{p.params.message}</p>
-      <p className="mb-3 break-all font-mono text-xs text-slate-500">{p.params.url}</p>
+      <p className="mb-3 text-sm text-muted-foreground">{p.params.message}</p>
+      <p className="mb-3 break-all font-mono text-xs text-muted-foreground">{p.params.url}</p>
       <div className="flex gap-2">
         <Button
           onClick={() => window.open(p.params.url, 'mcp-elicit', 'width=480,height=440')}
@@ -153,9 +153,9 @@ export function ElicitationHost() {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       data-testid="elicitation-modal"
     >
-      <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card text-card-foreground p-5 shadow-2xl">
         <div className="mb-3 flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-100">Server elicitation</span>
+          <span className="text-sm font-semibold text-card-foreground">Server elicitation</span>
           <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
             {mode} mode
           </span>

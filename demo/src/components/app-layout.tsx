@@ -40,7 +40,7 @@ function ThemeToggle() {
       title={`Switch to ${next} theme`}
       data-testid="theme-toggle"
       onClick={() => setTheme(next)}
-      className="shrink-0 rounded-md border border-slate-700 p-1.5 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+      className="shrink-0 rounded-md border border-sidebar-border p-1.5 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
     >
       {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
@@ -135,17 +135,21 @@ export function AppLayout() {
   const status = useStatus();
   const language = getLanguage();
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-200">
-      <aside className="flex w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-900/40">
-        <div className="border-b border-slate-800 px-4 py-4">
+    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+      <aside className="flex w-72 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <div className="border-b border-sidebar-border px-4 py-4">
           <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-blue-400" />
-            <span className="font-semibold text-slate-100">MCP V2 — Live Companion</span>
+            <Activity className="h-5 w-5 text-sidebar-primary" />
+            <span className="font-semibold text-sidebar-foreground">MCP V2 — Live Companion</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">A runnable companion to the MCP V2 RC book.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A runnable companion to the MCP V2 RC book.
+          </p>
           <div className="mt-2 flex items-center gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-slate-600">stack</span>
-            <Badge variant="blue" data-testid="active-language">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              stack
+            </span>
+            <Badge variant="outline" data-testid="active-language">
               {language.label}
             </Badge>
           </div>
@@ -154,7 +158,7 @@ export function AppLayout() {
         <nav className="min-h-0 flex-1 overflow-auto px-3 py-3">
           {NAV.map((section) => (
             <div key={section.group} className="mb-4">
-              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {section.group}
               </div>
               {section.items.map((item) => (
@@ -162,13 +166,13 @@ export function AppLayout() {
                   key={item.to}
                   to={item.to}
                   activeOptions={{ exact: item.to === '/' }}
-                  className="group flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-slate-300 hover:bg-slate-800/60 [&.active]:bg-blue-600/15 [&.active]:text-blue-200"
+                  className="group flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent [&.active]:bg-sidebar-primary/15 [&.active]:text-sidebar-primary"
                 >
                   <span>{item.label}</span>
-                  <span className="shrink-0 pl-2 text-right text-[9px] leading-tight text-slate-600 group-hover:text-slate-500">
+                  <span className="shrink-0 pl-2 text-right text-[9px] leading-tight text-sidebar-foreground/40 group-hover:text-sidebar-foreground/60">
                     {item.ch ? <span className="block">{item.ch}</span> : null}
                     {item.story ? (
-                      <span className="block text-blue-400/50">{item.story}</span>
+                      <span className="block text-sidebar-primary/60">{item.story}</span>
                     ) : null}
                   </span>
                 </Link>
@@ -177,23 +181,23 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="flex items-center justify-between gap-2 border-t border-slate-800 px-4 py-3 text-xs">
+        <div className="flex items-center justify-between gap-2 border-t border-sidebar-border px-4 py-3 text-xs">
           <div>
             <div className="flex items-center gap-2">
               <span
                 className={cn(
                   'h-2 w-2 rounded-full',
-                  status.connected ? 'bg-emerald-400' : 'bg-slate-600',
+                  status.connected ? 'bg-emerald-400' : 'bg-muted-foreground',
                 )}
               />
-              <span className="text-slate-400" data-testid="conn-status">
+              <span className="text-muted-foreground" data-testid="conn-status">
                 {status.connected ? 'MCP client connected' : 'not connected'}
               </span>
             </div>
             {status.negotiatedVersion ? (
-              <div className="mt-1 text-slate-500">
+              <div className="mt-1 text-muted-foreground">
                 protocol{' '}
-                <span className="font-mono text-slate-300" data-testid="proto-version">
+                <span className="font-mono text-sidebar-foreground" data-testid="proto-version">
                   {status.negotiatedVersion}
                 </span>
               </div>

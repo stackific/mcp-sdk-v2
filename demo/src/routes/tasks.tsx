@@ -101,8 +101,8 @@ export function TasksPage() {
           </div>
 
           {taskId ? (
-            <div className="text-xs text-slate-400">
-              taskId <span className="font-mono text-slate-300">{taskId.slice(0, 12)}…</span>
+            <div className="text-xs text-muted-foreground">
+              taskId <span className="font-mono text-muted-foreground">{taskId.slice(0, 12)}…</span>
             </div>
           ) : null}
 
@@ -112,7 +112,11 @@ export function TasksPage() {
                 <Badge
                   key={i}
                   variant={
-                    s.startsWith('completed') ? 'green' : s.startsWith('failed') ? 'red' : 'amber'
+                    s.startsWith('completed')
+                      ? 'secondary'
+                      : s.startsWith('failed')
+                        ? 'destructive'
+                        : 'destructive'
                   }
                 >
                   {s}

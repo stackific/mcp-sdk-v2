@@ -35,13 +35,13 @@ export function CapabilityPage({
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-4 shrink-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold text-slate-100">{title}</h1>
-          {chapter ? <Badge variant="blue">{chapter}</Badge> : null}
-          {story ? <Badge variant="slate">{story}</Badge> : null}
-          {deprecated ? <Badge variant="red">Deprecated</Badge> : null}
+          <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+          {chapter ? <Badge variant="outline">{chapter}</Badge> : null}
+          {story ? <Badge variant="ghost">{story}</Badge> : null}
+          {deprecated ? <Badge variant="destructive">Deprecated</Badge> : null}
         </div>
         {description ? (
-          <p className="mt-1 max-w-3xl text-sm text-slate-400">{description}</p>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p>
         ) : null}
         {typeof deprecated === 'string' ? (
           <p className="mt-1 max-w-3xl text-sm text-amber-400">
@@ -55,14 +55,14 @@ export function CapabilityPage({
             target="_blank"
             rel="noreferrer"
             data-testid="pattern-doc-link"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80"
           >
             View the {language.label} implementation pattern ↗
           </a>
         ) : null}
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="min-h-0 space-y-4 overflow-auto pr-1">{children}</div>
+        <div className="min-h-0 space-y-4 overflow-auto p-1">{children}</div>
         <div className="min-h-0">
           <WireDebug filter={wireFilter} />
         </div>

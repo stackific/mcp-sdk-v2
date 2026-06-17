@@ -36,9 +36,9 @@ export function CachingPage() {
 
           {result ? (
             <div className="flex flex-wrap items-center gap-2" data-testid="cache-hints">
-              <Badge variant="green">ttlMs: {String(result.ttlMs)}</Badge>
-              <Badge variant="blue">cacheScope: {String(result.cacheScope)}</Badge>
-              <Badge variant="slate">invocation #{String(meta?.invocation)}</Badge>
+              <Badge variant="secondary">ttlMs: {String(result.ttlMs)}</Badge>
+              <Badge variant="outline">cacheScope: {String(result.cacheScope)}</Badge>
+              <Badge variant="ghost">invocation #{String(meta?.invocation)}</Badge>
             </div>
           ) : null}
 

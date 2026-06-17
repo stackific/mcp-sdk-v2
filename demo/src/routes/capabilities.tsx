@@ -32,15 +32,15 @@ export function CapabilitiesPage() {
           >
             Load capabilities
           </Button>
-          {status.error ? <p className="text-sm text-red-400">{status.error}</p> : null}
+          {status.error ? <p className="text-sm text-destructive">{status.error}</p> : null}
           {s ? (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <div className="space-y-1">
-                <p className="text-xs font-medium text-slate-400">clientCapabilities</p>
+                <p className="text-xs font-medium text-muted-foreground">clientCapabilities</p>
                 <JsonBlock value={s.clientCapabilities ?? {}} />
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-slate-400">serverCapabilities</p>
+                <p className="text-xs font-medium text-muted-foreground">serverCapabilities</p>
                 <JsonBlock value={s.serverCapabilities ?? {}} />
               </div>
             </div>
@@ -51,7 +51,7 @@ export function CapabilitiesPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Effective availability of any feature is the intersection of what both peers declared.
             The mere presence of a field declares support; an entirely empty <code>{'{}'}</code> is

@@ -44,7 +44,7 @@ export function PromptsPage() {
           </Button>
           <div className="mt-2 space-y-1">
             {prompts.map((p) => (
-              <div key={p.name} className="text-xs text-slate-300">
+              <div key={p.name} className="text-xs text-muted-foreground">
                 <span className="font-mono">{p.name}</span> — {p.description}
               </div>
             ))}

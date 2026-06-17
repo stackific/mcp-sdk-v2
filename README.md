@@ -1,6 +1,43 @@
+<div align="center">
+
 # MCP V2 SDK — with a full-featured demo (multi-language)
 
-A runnable companion to the **[MCP V2 RC specification](docs/model-context-protocol.md)**. The shared frontend can be backed by any of
+**The MCP V2 RC, implemented three times over: TypeScript · Python · C# — behind one live, switch-the-language demo.**
+
+<!-- Status -->
+
+[![License: AGPL-3.0](https://img.shields.io/github/license/stackific/mcp-sdk-v2?color=blue)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/stackific/mcp-sdk-v2)](https://github.com/stackific/mcp-sdk-v2/commits/main)
+[![Open issues](https://img.shields.io/github/issues/stackific/mcp-sdk-v2)](https://github.com/stackific/mcp-sdk-v2/issues)
+
+<!-- Stack -->
+
+[![MCP V2 RC](https://img.shields.io/badge/MCP-V2%20RC%202026--07--28-2563eb)](docs/model-context-protocol.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)](ts-sdk)
+[![Python](https://img.shields.io/badge/Python-3776ab?logo=python&logoColor=white)](py-sdk)
+[![.NET 10](https://img.shields.io/badge/.NET%2010-512bd4?logo=dotnet&logoColor=white)](csharp-sdk)
+[![Tests](https://img.shields.io/badge/tests-11%2C409%20passing-2ea043)](#build--verify)
+
+</div>
+
+---
+
+## 🎬 Demo
+
+<!-- Sample placeholder — replace docs/promo.mp4 with the real recording (named promo.mp4). -->
+
+<div align="center">
+
+<video src="https://github.com/stackific/mcp-sdk-v2/raw/main/docs/promo.mp4" controls muted width="80%">
+  Your browser can't play embedded video —
+  <a href="docs/promo.mp4">download the tutorial (<code>docs/promo.mp4</code>)</a> instead.
+</video>
+
+</div>
+
+> ▶️ Player not showing? Watch it directly: [`docs/promo.mp4`](docs/promo.mp4).
+
+Three SDKs behind a runnable companion to app showing 36 patterns from the **[MCP V2 RC specification](docs/model-context-protocol.md)**. The shared frontend can be backed by any of
 several **language stacks** — pick one on the home page and it repoints at that stack's MCP **client
 host** (a different backend + server configuration on its own ports):
 

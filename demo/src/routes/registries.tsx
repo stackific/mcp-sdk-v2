@@ -84,7 +84,7 @@ export function RegistriesPage() {
           </Button>
           <div data-testid="registry-methods" className="flex flex-wrap gap-1.5">
             {tools.map((t) => (
-              <Badge key={t.name} variant="blue">
+              <Badge key={t.name} variant="outline">
                 {t.name}
               </Badge>
             ))}
@@ -103,7 +103,7 @@ export function RegistriesPage() {
         <CardContent>
           <div className="flex flex-wrap gap-1.5">
             {METHODS.map((m) => (
-              <Badge key={m} variant="slate">
+              <Badge key={m} variant="ghost">
                 {m}
               </Badge>
             ))}
@@ -120,10 +120,10 @@ export function RegistriesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-1 text-sm text-slate-400">
+          <ul className="space-y-1 text-sm text-muted-foreground">
             {ERROR_CODES.map((e) => (
               <li key={e.code}>
-                <span className="font-mono text-slate-300">{e.code}</span> — {e.name}
+                <span className="font-mono text-muted-foreground">{e.code}</span> — {e.name}
               </li>
             ))}
           </ul>
@@ -138,10 +138,10 @@ export function RegistriesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-1 text-sm text-slate-400">
+          <ul className="space-y-1 text-sm text-muted-foreground">
             {META_KEYS.map((k) => (
               <li key={k}>
-                <span className="font-mono text-slate-300">{k}</span>
+                <span className="font-mono text-muted-foreground">{k}</span>
               </li>
             ))}
           </ul>
@@ -154,7 +154,7 @@ export function RegistriesPage() {
           <CardDescription>Negotiated client, server, and extension capabilities.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-1 text-sm text-slate-400">
+          <ul className="space-y-1 text-sm text-muted-foreground">
             {CAPABILITIES.map((c) => (
               <li key={c}>{c}</li>
             ))}
@@ -166,7 +166,7 @@ export function RegistriesPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Appendices A–E are governance artifacts: each is a single consolidated table that
             indexes one category of wire surface and points to its defining section, which stays

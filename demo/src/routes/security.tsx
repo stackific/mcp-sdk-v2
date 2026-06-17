@@ -100,10 +100,12 @@ export function SecurityPage() {
             {CHECKLIST.map((item) => (
               <li key={item.label} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <Badge variant={item.level === 'MUST' ? 'amber' : 'slate'}>{item.level}</Badge>
-                  <span className="font-medium text-slate-100">{item.label}</span>
+                  <Badge variant={item.level === 'MUST' ? 'destructive' : 'ghost'}>
+                    {item.level}
+                  </Badge>
+                  <span className="font-medium text-card-foreground">{item.label}</span>
                 </div>
-                <p className="text-slate-400">{item.detail}</p>
+                <p className="text-muted-foreground">{item.detail}</p>
               </li>
             ))}
           </ul>
@@ -113,7 +115,7 @@ export function SecurityPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             The protocol cannot enforce most of these at the wire level, so conformance depends on
             implementations building them in. A few observable behaviors do surface as errors:

@@ -44,17 +44,17 @@ export function FoundationsPage() {
           {s ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={s.connected ? 'green' : 'red'}>
+                <Badge variant={s.connected ? 'secondary' : 'destructive'}>
                   {s.connected ? 'connected' : 'disconnected'}
                 </Badge>
-                <Badge variant="blue">revision: {s.negotiatedVersion ?? 'none'}</Badge>
+                <Badge variant="outline">revision: {s.negotiatedVersion ?? 'none'}</Badge>
               </div>
               <JsonBlock
                 value={{ negotiatedVersion: s.negotiatedVersion, serverInfo: s.serverInfo }}
               />
             </div>
           ) : (
-            <p className="text-sm text-slate-400">Press Run to read the live status.</p>
+            <p className="text-sm text-muted-foreground">Press Run to read the live status.</p>
           )}
         </CardContent>
       </Card>
@@ -62,7 +62,7 @@ export function FoundationsPage() {
         <CardHeader>
           <CardTitle>Conformance model (RFC 2119)</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             The keywords MUST / MUST NOT / REQUIRED / SHALL / SHALL NOT / SHOULD / SHOULD NOT /
             RECOMMENDED / MAY / OPTIONAL carry their RFC 2119 / RFC 8174 meaning only when they
@@ -70,21 +70,21 @@ export function FoundationsPage() {
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <span className="text-slate-300">MUST / REQUIRED / SHALL</span> — an absolute
+              <span className="text-card-foreground">MUST / REQUIRED / SHALL</span> — an absolute
               requirement, satisfied without exception.
             </li>
             <li>
-              <span className="text-slate-300">MUST NOT / SHALL NOT</span> — an absolute
+              <span className="text-card-foreground">MUST NOT / SHALL NOT</span> — an absolute
               prohibition, never done.
             </li>
             <li>
-              <span className="text-slate-300">SHOULD / RECOMMENDED</span> — deviate only when the
-              full implications are understood and a valid reason exists.
+              <span className="text-card-foreground">SHOULD / RECOMMENDED</span> — deviate only when
+              the full implications are understood and a valid reason exists.
             </li>
             <li>
-              <span className="text-slate-300">MAY / OPTIONAL</span> — including or omitting it are
-              both conforming, and each must interoperate with the other (possibly with reduced
-              functionality).
+              <span className="text-card-foreground">MAY / OPTIONAL</span> — including or omitting
+              it are both conforming, and each must interoperate with the other (possibly with
+              reduced functionality).
             </li>
             <li>
               An implementation is conforming if and only if it satisfies every applicable MUST /
@@ -97,24 +97,24 @@ export function FoundationsPage() {
         <CardHeader>
           <CardTitle>JSON-RPC 2.0, one current revision</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             The communication model is built on JSON-RPC 2.0 with three message kinds carried over a
             single current protocol revision.
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              A <span className="text-slate-300">request</span> carries an <code>id</code>, a{' '}
+              A <span className="text-card-foreground">request</span> carries an <code>id</code>, a{' '}
               <code>method</code>, and optional <code>params</code>, and requires exactly one
               matching response.
             </li>
             <li>
-              A <span className="text-slate-300">response</span> is a result or an error, never
-              both.
+              A <span className="text-card-foreground">response</span> is a result or an error,
+              never both.
             </li>
             <li>
-              A <span className="text-slate-300">notification</span> carries a method and optional
-              params but no id, and gets no response.
+              A <span className="text-card-foreground">notification</span> carries a method and
+              optional params but no id, and gets no response.
             </li>
             <li>
               The mandatory baseline — base message format, revision handling, and the core message
@@ -128,20 +128,20 @@ export function FoundationsPage() {
         <CardHeader>
           <CardTitle>Roles: host, client, server</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <span className="text-slate-300">Host</span> — owns the user relationship and trust
-              boundary, makes consent decisions, and creates/coordinates clients; it is not itself a
-              role on the wire.
+              <span className="text-card-foreground">Host</span> — owns the user relationship and
+              trust boundary, makes consent decisions, and creates/coordinates clients; it is not
+              itself a role on the wire.
             </li>
             <li>
-              <span className="text-slate-300">Client</span> — runs inside the host, bound
+              <span className="text-card-foreground">Client</span> — runs inside the host, bound
               one-to-one to a single server, and sends client-originated requests.
             </li>
             <li>
-              <span className="text-slate-300">Server</span> — exposes tools, resources, prompts,
-              and completion; servers are isolated and cannot observe one another.
+              <span className="text-card-foreground">Server</span> — exposes tools, resources,
+              prompts, and completion; servers are isolated and cannot observe one another.
             </li>
             <li>
               Servers are stateless: a server infers no revision, identity, or capability from a

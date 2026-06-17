@@ -47,10 +47,10 @@ export function LifecyclePage() {
             The three governed states and the V2 registry of deprecated features.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-slate-400">
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
           <table data-testid="lifecycle-table" className="w-full text-left">
             <thead>
-              <tr className="text-slate-300">
+              <tr className="text-muted-foreground">
                 <th className="py-1 pr-4">Feature / Stage</th>
                 <th className="py-1 pr-4">State</th>
                 <th className="py-1">Note</th>
@@ -60,7 +60,7 @@ export function LifecyclePage() {
               <tr>
                 <td className="py-1 pr-4">Tools, Resources, Prompts</td>
                 <td className="py-1 pr-4">
-                  <Badge variant="green">Active</Badge>
+                  <Badge variant="secondary">Active</Badge>
                 </td>
                 <td className="py-1">
                   Fully supported; implement as specified, subject to capability negotiation.
@@ -69,7 +69,7 @@ export function LifecyclePage() {
               <tr>
                 <td className="py-1 pr-4">Roots</td>
                 <td className="py-1 pr-4">
-                  <Badge variant="amber">Deprecated</Badge>
+                  <Badge variant="destructive">Deprecated</Badge>
                 </td>
                 <td className="py-1">
                   Still accepted and functional; discouraged for new use, carries a migration note.
@@ -78,7 +78,7 @@ export function LifecyclePage() {
               <tr>
                 <td className="py-1 pr-4">Sampling</td>
                 <td className="py-1 pr-4">
-                  <Badge variant="amber">Deprecated</Badge>
+                  <Badge variant="destructive">Deprecated</Badge>
                 </td>
                 <td className="py-1">
                   Still accepted and functional; behavior unchanged by deprecated status.
@@ -87,7 +87,7 @@ export function LifecyclePage() {
               <tr>
                 <td className="py-1 pr-4">Extensions (§24)</td>
                 <td className="py-1 pr-4">
-                  <Badge variant="blue">Extension</Badge>
+                  <Badge variant="outline">Extension</Badge>
                 </td>
                 <td className="py-1">
                   Own independent lifecycle; the §27.2 window and removal rules do not govern them.
@@ -101,7 +101,7 @@ export function LifecyclePage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             §27 defines a three-state lifecycle and disciplines how any feature ages. The key
             normative points:

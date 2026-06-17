@@ -42,18 +42,18 @@ export function ContentPage() {
                 if (b.type === 'text') {
                   return (
                     <div key={i} className="space-y-1">
-                      <Badge variant="blue">text</Badge>
-                      <p className="text-sm text-slate-200">{b.text}</p>
+                      <Badge variant="outline">text</Badge>
+                      <p className="text-sm text-card-foreground">{b.text}</p>
                     </div>
                   );
                 }
                 if (b.type === 'image') {
                   return (
                     <div key={i} className="space-y-1">
-                      <Badge variant="green">image</Badge>
+                      <Badge variant="secondary">image</Badge>
                       <img
                         src={`data:${b.mimeType};base64,${b.data}`}
-                        className="max-h-32 rounded border border-slate-800"
+                        className="max-h-32 rounded border border-border"
                       />
                     </div>
                   );
@@ -61,7 +61,7 @@ export function ContentPage() {
                 if (b.type === 'audio') {
                   return (
                     <div key={i} className="space-y-1">
-                      <Badge variant="amber">audio</Badge>
+                      <Badge variant="destructive">audio</Badge>
                       <audio controls src={`data:${b.mimeType};base64,${b.data}`} />
                     </div>
                   );
@@ -69,8 +69,10 @@ export function ContentPage() {
                 if (b.type === 'resource') {
                   return (
                     <div key={i} className="space-y-1">
-                      <Badge variant="slate">resource</Badge>
-                      <div className="text-xs font-mono text-slate-400">{b.resource?.uri}</div>
+                      <Badge variant="ghost">resource</Badge>
+                      <div className="text-xs font-mono text-muted-foreground">
+                        {b.resource?.uri}
+                      </div>
                       <JsonBlock value={b.resource?.text ?? b.resource} />
                     </div>
                   );
@@ -78,8 +80,8 @@ export function ContentPage() {
                 if (b.type === 'resource_link') {
                   return (
                     <div key={i} className="flex flex-wrap items-center gap-2">
-                      <Badge variant="blue">resource_link</Badge>
-                      <a href={b.uri} className="font-mono text-xs text-blue-300 hover:underline">
+                      <Badge variant="outline">resource_link</Badge>
+                      <a href={b.uri} className="font-mono text-xs text-primary hover:underline">
                         {b.name ?? b.uri}
                       </a>
                     </div>
@@ -87,8 +89,8 @@ export function ContentPage() {
                 }
                 return (
                   <div key={i} className="space-y-1">
-                    <Badge variant="red">{String(b.type)}</Badge>
-                    <p className="text-xs text-slate-400">
+                    <Badge variant="destructive">{String(b.type)}</Badge>
+                    <p className="text-xs text-muted-foreground">
                       Unrecognized type — treated as unsupported content, the message is not failed.
                     </p>
                   </div>
@@ -103,7 +105,7 @@ export function ContentPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             ContentBlock is a discriminated union dispatched on a case-sensitive type string. An
             unrecognized type SHOULD be treated as unsupported content rather than failing the whole
@@ -111,18 +113,19 @@ export function ContentPage() {
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <span className="font-mono text-slate-300">text</span> /{' '}
-              <span className="font-mono text-slate-300">image</span> /{' '}
-              <span className="font-mono text-slate-300">audio</span> — inline blocks; image and
-              audio carry Base64 data plus a required mimeType.
+              <span className="font-mono text-card-foreground">text</span> /{' '}
+              <span className="font-mono text-card-foreground">image</span> /{' '}
+              <span className="font-mono text-card-foreground">audio</span> — inline blocks; image
+              and audio carry Base64 data plus a required mimeType.
             </li>
             <li>
-              <span className="font-mono text-slate-300">resource_link</span> references a resource
-              by uri (reusing BaseMetadata name/title and the Icons mixin) instead of embedding it.
+              <span className="font-mono text-card-foreground">resource_link</span> references a
+              resource by uri (reusing BaseMetadata name/title and the Icons mixin) instead of
+              embedding it.
             </li>
             <li>
-              <span className="font-mono text-slate-300">resource</span> (EmbeddedResource) nests a
-              ResourceContents value: exactly one of text (TextResourceContents) XOR blob
+              <span className="font-mono text-card-foreground">resource</span> (EmbeddedResource)
+              nests a ResourceContents value: exactly one of text (TextResourceContents) XOR blob
               (BlobResourceContents) — never both.
             </li>
             <li>

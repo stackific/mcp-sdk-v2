@@ -45,7 +45,7 @@ export function JsonRpcPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Each message is one standalone JSON object carrying a jsonrpc marker equal to "2.0".
             Batches (top-level arrays) are forbidden. Which members are present decides the message
@@ -53,35 +53,36 @@ export function JsonRpcPage() {
           </p>
           <ul className="ml-4 list-disc space-y-1">
             <li>
-              <span className="text-slate-300">Request</span> — carries both an <code>id</code> and
-              a <code>method</code>; expects exactly one response. The <code>id</code> (a string or
-              number, never null) correlates the response back to it.
+              <span className="text-card-foreground">Request</span> — carries both an{' '}
+              <code>id</code> and a <code>method</code>; expects exactly one response. The{' '}
+              <code>id</code> (a string or number, never null) correlates the response back to it.
             </li>
             <li>
-              <span className="text-slate-300">Notification</span> — carries a <code>method</code>{' '}
-              but <span className="text-slate-300">no id</span>; it is one-way and MUST never be
-              answered (even if malformed or unknown, it is silently discarded).
+              <span className="text-card-foreground">Notification</span> — carries a{' '}
+              <code>method</code> but <span className="text-card-foreground">no id</span>; it is
+              one-way and MUST never be answered (even if malformed or unknown, it is silently
+              discarded).
             </li>
             <li>
-              <span className="text-slate-300">Response</span> — carries exactly one of{' '}
+              <span className="text-card-foreground">Response</span> — carries exactly one of{' '}
               <code>result</code> or <code>error</code>, never both and never neither. A success
               response echoes the request <code>id</code> with the same JSON type and value.
             </li>
             <li>
-              <span className="text-slate-300">Result base (S04)</span> — every success{' '}
+              <span className="text-card-foreground">Result base (S04)</span> — every success{' '}
               <code>result</code> sets a required <code>resultType</code> discriminator (e.g.
               "complete"); an absent value is treated as "complete", an unrecognized one as an
               error.
             </li>
             <li>
-              <span className="text-slate-300">Error object</span> — the <code>error</code> member
-              is {'{'} <code>code</code> (required integer), <code>message</code> (required string),{' '}
-              <code>data</code> (optional, sender-defined) {'}'}.
+              <span className="text-card-foreground">Error object</span> — the <code>error</code>{' '}
+              member is {'{'} <code>code</code> (required integer), <code>message</code> (required
+              string), <code>data</code> (optional, sender-defined) {'}'}.
             </li>
             <li>
-              <span className="text-slate-300">EmptyResult</span> — a method that returns nothing
-              method-specific still emits a result that sets <code>resultType</code> (normally
-              "complete") and carries no extra members beyond the base.
+              <span className="text-card-foreground">EmptyResult</span> — a method that returns
+              nothing method-specific still emits a result that sets <code>resultType</code>{' '}
+              (normally "complete") and carries no extra members beyond the base.
             </li>
           </ul>
         </CardContent>

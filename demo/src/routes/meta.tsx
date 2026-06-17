@@ -46,7 +46,7 @@ export function MetaPage() {
           </Button>
           {echoed ? (
             <div className="space-y-1">
-              <div className="text-xs text-slate-400">server echoed _meta:</div>
+              <div className="text-xs text-muted-foreground">server echoed _meta:</div>
               <JsonBlock value={echoed} />
             </div>
           ) : null}
@@ -57,7 +57,7 @@ export function MetaPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             _meta is a generic, string-keyed map whose member values may be any JSON value. It is
             optional on params and results, but every client request must carry one because the

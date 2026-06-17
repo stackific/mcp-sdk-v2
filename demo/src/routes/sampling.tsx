@@ -43,11 +43,11 @@ export function SamplingPage() {
           <CardTitle>Model provider</CardTitle>
         </CardHeader>
         <CardContent>
-          <Badge variant={isMock ? 'amber' : 'green'} data-testid="sampling-provider">
+          <Badge variant={isMock ? 'destructive' : 'secondary'} data-testid="sampling-provider">
             {provider ?? '…'}
           </Badge>
           {isMock ? (
-            <span className="ml-2 text-xs text-slate-500">
+            <span className="ml-2 text-xs text-muted-foreground">
               Set DEEPSEEK_API_KEY in backend/.env for a real DeepSeek answer.
             </span>
           ) : null}

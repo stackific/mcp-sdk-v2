@@ -5,7 +5,7 @@ export function JsonBlock({ value, className }: { value: unknown; className?: st
   return (
     <pre
       className={cn(
-        'max-h-80 overflow-auto rounded-md bg-slate-950/70 p-3 font-mono text-xs leading-relaxed text-slate-300 ring-1 ring-inset ring-slate-800',
+        'max-h-80 overflow-auto rounded-md bg-background/70 p-3 font-mono text-xs leading-relaxed text-muted-foreground ring-1 ring-inset ring-border',
         className,
       )}
     >

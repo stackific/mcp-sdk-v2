@@ -47,7 +47,7 @@ export function JsonModelPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Every value on the wire is one of six JSONValue forms. This story fixes the
             cross-cutting rules that govern how those values are encoded, named, numerically

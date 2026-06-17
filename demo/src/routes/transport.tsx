@@ -40,32 +40,32 @@ export function TransportPage() {
           {probe ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={statusOk ? 'green' : 'red'}>
+                <Badge variant={statusOk ? 'secondary' : 'destructive'}>
                   {probe.status} {probe.statusText}
                 </Badge>
-                <Badge variant="blue">
+                <Badge variant="outline">
                   {probe.method} {probe.url}
                 </Badge>
                 {probe.negotiatedVersion ? (
-                  <Badge variant="slate">MCP-Protocol-Version: {probe.negotiatedVersion}</Badge>
+                  <Badge variant="ghost">MCP-Protocol-Version: {probe.negotiatedVersion}</Badge>
                 ) : null}
-                <Badge variant={probe.sessionId ? 'amber' : 'slate'}>
+                <Badge variant={probe.sessionId ? 'destructive' : 'ghost'}>
                   {probe.sessionId
                     ? `Mcp-Session-Id: ${probe.sessionId}`
                     : 'no Mcp-Session-Id (stateless)'}
                 </Badge>
                 {probe.contentType ? (
-                  <Badge variant="slate">Content-Type: {probe.contentType}</Badge>
+                  <Badge variant="ghost">Content-Type: {probe.contentType}</Badge>
                 ) : null}
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-slate-400">Request headers</div>
+                <div className="text-xs text-muted-foreground">Request headers</div>
                 <JsonBlock value={probe.requestHeaders} />
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-slate-400">Response headers</div>
+                <div className="text-xs text-muted-foreground">Response headers</div>
                 <JsonBlock value={probe.responseHeaders} />
               </div>
             </div>
@@ -79,7 +79,7 @@ export function TransportPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             MCP defines one transport contract (a bidirectional, integrity-preserving, UTF-8 JSON
             channel) and two concrete transports. This companion app uses Streamable HTTP; stdio is

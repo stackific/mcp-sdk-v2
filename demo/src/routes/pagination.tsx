@@ -69,13 +69,13 @@ export function PaginationPage() {
 
           {items.length > 0 ? (
             <div
-              className="rounded-md border border-slate-800 bg-slate-900/40 p-3 text-sm"
+              className="rounded-md border border-border bg-card/40 p-3 text-sm"
               data-testid="paged-items"
             >
-              <div className="mb-1 text-xs text-slate-500">
+              <div className="mb-1 text-xs text-muted-foreground">
                 {items.length} loaded{cursor ? ` · next cursor: ${cursor}` : done ? ' · end' : ''}
               </div>
-              <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-xs text-slate-300">
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-xs text-muted-foreground">
                 {items.map((it) => (
                   <li key={it.id}>
                     #{it.id} {it.name}

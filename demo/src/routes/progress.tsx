@@ -78,14 +78,14 @@ export function ProgressPage() {
 
           {pct !== null ? (
             <div>
-              <div className="mb-1 flex justify-between text-xs text-slate-400">
+              <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                 <span data-testid="progress-label">
                   progress {p?.params?.progress}/{p?.params?.total}
                 </span>
                 <span>{pct}%</span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded bg-slate-800">
-                <div className="h-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+              <div className="h-2 w-full overflow-hidden rounded bg-muted">
+                <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
               </div>
             </div>
           ) : null}

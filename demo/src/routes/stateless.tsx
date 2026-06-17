@@ -37,15 +37,15 @@ export function StatelessPage() {
             <div className="space-y-3">
               <div className="grid gap-2 text-sm sm:grid-cols-2">
                 <div>
-                  <div className="text-slate-400">Server URL</div>
+                  <div className="text-muted-foreground">Server URL</div>
                   <div className="font-mono">{s.serverUrl ?? '—'}</div>
                 </div>
                 <div>
-                  <div className="text-slate-400">Negotiated version</div>
+                  <div className="text-muted-foreground">Negotiated version</div>
                   <div className="font-mono">{s.negotiatedVersion ?? '—'}</div>
                 </div>
               </div>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 Each request is self-contained: the server derives identity, capabilities, and
                 version solely from the current request's <code>_meta</code>, never from earlier
                 requests or the connection.
@@ -59,7 +59,7 @@ export function StatelessPage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             V2 is stateless per request: the protocol requires no implicit session state, no
             handshake, and no prior request before a server will process a given call.

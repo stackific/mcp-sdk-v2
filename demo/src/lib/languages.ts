@@ -45,7 +45,7 @@ export const LANGUAGES: readonly LanguageStack[] = [
     label: 'C#',
     tagline: 'Minimal API · .NET 10',
     clientUrl: env.VITE_CSHARP_CLIENT_URL ?? 'http://localhost:8202',
-    status: 'preview',
+    status: 'ready',
   },
 ];
 

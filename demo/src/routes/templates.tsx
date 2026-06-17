@@ -48,7 +48,7 @@ export function TemplatesPage() {
           </Button>
           <div className="mt-2 space-y-1">
             {templates.map((t) => (
-              <div key={t.uriTemplate} className="font-mono text-xs text-slate-300">
+              <div key={t.uriTemplate} className="font-mono text-xs text-muted-foreground">
                 {t.uriTemplate}
               </div>
             ))}

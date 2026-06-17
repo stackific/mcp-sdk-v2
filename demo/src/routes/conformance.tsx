@@ -51,15 +51,15 @@ export function ConformancePage() {
           >
             Load conformance profile
           </Button>
-          {status.error ? <p className="text-sm text-red-400">{status.error}</p> : null}
+          {status.error ? <p className="text-sm text-destructive">{status.error}</p> : null}
           {s ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-slate-300">
-                <span className="text-slate-400">negotiatedVersion</span>
-                <Badge variant="blue">{s.negotiatedVersion ?? 'none'}</Badge>
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
+                <span className="text-muted-foreground">negotiatedVersion</span>
+                <Badge variant="outline">{s.negotiatedVersion ?? 'none'}</Badge>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-slate-400">serverCapabilities</p>
+                <p className="text-xs font-medium text-muted-foreground">serverCapabilities</p>
                 <JsonBlock value={s.serverCapabilities ?? {}} />
               </div>
             </div>
@@ -79,15 +79,15 @@ export function ConformancePage() {
             {CONFORMANCE_AREAS.map((row) => (
               <li
                 key={row.area}
-                className="flex items-center justify-between gap-3 rounded-md border border-slate-800 px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-200">{row.area}</p>
-                  <p className="truncate text-xs text-slate-400">
+                  <p className="text-sm font-medium text-card-foreground">{row.area}</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {row.spec} · see “{row.page}”
                   </p>
                 </div>
-                <Badge variant="green">demonstrated</Badge>
+                <Badge variant="secondary">demonstrated</Badge>
               </li>
             ))}
           </ul>
@@ -97,7 +97,7 @@ export function ConformancePage() {
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-slate-400">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Normative weight uses RFC 2119 keywords — MUST / MUST NOT / REQUIRED / SHALL / SHALL NOT
             for absolute requirements, SHOULD / SHOULD NOT for strong recommendations, and MAY /
