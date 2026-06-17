@@ -141,13 +141,11 @@ public static class Dispatch
     }
 
     // Validate the params shape when a validator is registered and params is present (R-3.3-k).
-    if (descriptor.ParamsValidator is not null && request.Params is not null)
+    if (descriptor.ParamsValidator is not null && request.Params is not null &&
+        !descriptor.ParamsValidator(request.Params))
     {
-      if (!descriptor.ParamsValidator(request.Params))
-      {
-        return DispatchOutcome.Failure(
-          ErrorResponse(request.Id, ErrorCodes.InvalidParams, "Invalid params"));
-      }
+      return DispatchOutcome.Failure(
+        ErrorResponse(request.Id, ErrorCodes.InvalidParams, "Invalid params"));
     }
 
     return DispatchOutcome.Success;

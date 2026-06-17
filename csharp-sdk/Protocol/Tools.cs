@@ -310,20 +310,13 @@ public static class ToolSchemas
     switch (value)
     {
       case JsonArray array:
-        foreach (var element in array)
-        {
-          if (HasExternalRefWalk(element, depth + 1, maxDepth)) return true;
-        }
-
-        return false;
+        return array.Any(element => HasExternalRefWalk(element, depth + 1, maxDepth));
       case JsonObject obj:
-        foreach (var key in new[] { "$ref", "$dynamicRef" })
+        if (new[] { "$ref", "$dynamicRef" }.Any(key =>
+              obj[key] is JsonValue refValue && refValue.GetValueKind() == JsonValueKind.String
+              && !IsInDocumentRef(refValue.GetValue<string>())))
         {
-          if (obj[key] is JsonValue refValue && refValue.GetValueKind() == JsonValueKind.String
-              && !IsInDocumentRef(refValue.GetValue<string>()))
-          {
-            return true;
-          }
+          return true;
         }
 
         foreach (var (_, child) in obj)

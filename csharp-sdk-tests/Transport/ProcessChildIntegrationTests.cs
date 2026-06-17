@@ -20,19 +20,13 @@ public sealed class ProcessChildIntegrationTests
   {
     if (OperatingSystem.IsWindows()) return; // POSIX-only (/bin/sh).
 
-    var child = ProcessChild.Launch("/bin/sh", ["-c", "exit 7"]);
+    using var child = ProcessChild.Launch("/bin/sh", ["-c", "exit 7"]);
     var exited = new TaskCompletionSource<int?>();
     child.Exited += code => exited.TrySetResult(code);
-    try
-    {
-      var code = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
-      Assert.Equal(7, code);
-      Assert.Equal(7, child.ExitCode);
-    }
-    finally
-    {
-      child.Dispose();
-    }
+
+    var code = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Assert.Equal(7, code);
+    Assert.Equal(7, child.ExitCode);
   }
 
   [Fact]
@@ -41,22 +35,16 @@ public sealed class ProcessChildIntegrationTests
     if (OperatingSystem.IsWindows()) return; // POSIX-only signal escalation (SIGKILL).
 
     // A child that would otherwise live for 30s, so the forced kill is what actually terminates it.
-    var child = ProcessChild.Launch("/bin/sh", ["-c", "sleep 30"]);
+    using var child = ProcessChild.Launch("/bin/sh", ["-c", "sleep 30"]);
     var exited = new TaskCompletionSource<int?>();
     child.Exited += code => exited.TrySetResult(code);
-    try
-    {
-      Assert.Null(child.ExitCode); // the child is alive before the kill.
 
-      // §8.6.3-a: forced kill — Process.Kill(entireProcessTree: true), which is SIGKILL on Unix.
-      child.Kill(KillSignal.Force);
+    Assert.Null(child.ExitCode); // the child is alive before the kill.
 
-      await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
-      Assert.NotNull(child.ExitCode); // observed as terminated (no longer running).
-    }
-    finally
-    {
-      child.Dispose();
-    }
+    // §8.6.3-a: forced kill — Process.Kill(entireProcessTree: true), which is SIGKILL on Unix.
+    child.Kill(KillSignal.Force);
+
+    await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    Assert.NotNull(child.ExitCode); // observed as terminated (no longer running).
   }
 }

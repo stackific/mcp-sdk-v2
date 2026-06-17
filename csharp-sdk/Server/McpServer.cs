@@ -522,8 +522,8 @@ public sealed class McpServer : IMcpRequestHandler, IMcpSubscriptionHandler
   {
     const long defaultTtlMs = 300000;
     if (prms["task"] is not JsonObject task) return defaultTtlMs;
-    if (!task.ContainsKey("ttl")) return defaultTtlMs;
-    return task["ttl"] is JsonValue v && v.GetValueKind() == JsonValueKind.Number && v.TryGetValue(out long ttl)
+    if (!task.TryGetPropertyValue("ttl", out var ttlNode)) return defaultTtlMs;
+    return ttlNode is JsonValue v && v.GetValueKind() == JsonValueKind.Number && v.TryGetValue(out long ttl)
       ? ttl
       : null; // present-and-null (or non-numeric) ⇒ unbounded lifetime.
   }
@@ -585,12 +585,11 @@ public sealed class McpServer : IMcpRequestHandler, IMcpSubscriptionHandler
       }
     }
 
-    foreach (var argument in registered.Prompt.Arguments ?? [])
+    var missingArgument = (registered.Prompt.Arguments ?? [])
+      .FirstOrDefault(argument => argument.Required == true && !arguments.ContainsKey(argument.Name));
+    if (missingArgument is not null)
     {
-      if (argument.Required == true && !arguments.ContainsKey(argument.Name))
-      {
-        throw McpError.InvalidParams($"Missing required prompt argument: {argument.Name}");
-      }
+      throw McpError.InvalidParams($"Missing required prompt argument: {missingArgument.Name}");
     }
 
     var result = await registered.Handler(arguments).ConfigureAwait(false);
@@ -663,18 +662,11 @@ public sealed class McpServer : IMcpRequestHandler, IMcpSubscriptionHandler
 
   private IReadOnlyList<string> CompleteTemplate(string uri, string variable, string value)
   {
-    foreach (var template in _templates)
-    {
-      if (template.Template.UriTemplate != uri) continue;
-      if (template.Completers is not null && template.Completers.TryGetValue(variable, out var completer))
-      {
-        return completer(value);
-      }
-
-      return [];
-    }
-
-    return [];
+    var template = _templates.FirstOrDefault(t => t.Template.UriTemplate == uri);
+    if (template is null) return [];
+    return template.Completers is not null && template.Completers.TryGetValue(variable, out var completer)
+      ? completer(value)
+      : [];
   }
 
   private JsonObject GetTask(JsonObject? prms, RequestMeta meta)
@@ -891,15 +883,8 @@ public sealed class McpServer : IMcpRequestHandler, IMcpSubscriptionHandler
 
     public IReadOnlyList<string>? ResourceTemplateVariableNames(string uri)
     {
-      foreach (var template in templates)
-      {
-        if (template.Template.UriTemplate == uri)
-        {
-          return template.Matcher.VariableNames;
-        }
-      }
-
-      return null;
+      var template = templates.FirstOrDefault(t => t.Template.UriTemplate == uri);
+      return template?.Matcher.VariableNames;
     }
   }
 }

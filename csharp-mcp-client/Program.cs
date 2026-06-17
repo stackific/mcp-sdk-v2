@@ -111,10 +111,10 @@ app.MapPost("/api/tools/call-traced", (JsonObject body) => Run(async () =>
 }));
 
 // ── Subscriptions (open a subscriptions/listen stream; returns the honored filter) ──
-app.MapPost("/api/subscribe", (JsonObject body) => Run(async () => (object?)await host.SubscribeAsync(body)));
+app.MapPost("/api/subscribe", (JsonObject body) => Run(async () => await host.SubscribeAsync(body)));
 
 // ── Authorization: run the full OAuth 2.1 + PKCE handshake against the protected MCP resource ──
-app.MapPost("/api/authorize/run", () => Run(async () => (object?)await AuthFlow.RunAsync(host, authServerUrl, frontendUrl)));
+app.MapPost("/api/authorize/run", () => Run(async () => await AuthFlow.RunAsync(host, authServerUrl, frontendUrl)));
 
 // ── Generic JSON-RPC passthrough (ping, tasks/cancel, …) ──
 app.MapPost("/api/raw", (JsonObject body) => Run(async () =>
@@ -208,7 +208,7 @@ app.MapGet("/api/transport/probe", (IHttpClientFactory httpClientFactory) => Run
       },
     },
   };
-  var probe = new HttpRequestMessage(HttpMethod.Post, host.ServerUrl)
+  using var probe = new HttpRequestMessage(HttpMethod.Post, host.ServerUrl)
   {
     Content = new StringContent(probeBody.ToJsonString(), Encoding.UTF8, "application/json"),
   };
@@ -249,18 +249,20 @@ app.MapGet("/debug/stream", async (HttpContext ctx) =>
 
   await SendEventAsync(ctx, "status", host.Status());
   var reader = host.Bus.Subscribe(out var unsubscribe);
-  try
+  using (unsubscribe)
   {
-    while (!ctx.RequestAborted.IsCancellationRequested)
+    try
     {
-      var read = reader.ReadAsync(ctx.RequestAborted).AsTask();
-      var done = await Task.WhenAny(read, Task.Delay(15000, ctx.RequestAborted));
-      if (done == read) await SendEventAsync(ctx, "frame", await read);
-      else await SendEventAsync(ctx, "ping", new { });
+      while (!ctx.RequestAborted.IsCancellationRequested)
+      {
+        var read = reader.ReadAsync(ctx.RequestAborted).AsTask();
+        var done = await Task.WhenAny(read, Task.Delay(15000, ctx.RequestAborted));
+        if (done == read) await SendEventAsync(ctx, "frame", await read);
+        else await SendEventAsync(ctx, "ping", new { });
+      }
     }
+    catch (OperationCanceledException) { /* client disconnected */ }
   }
-  catch (OperationCanceledException) { /* client disconnected */ }
-  finally { unsubscribe.Dispose(); }
 });
 
 // ── Catch-all for capabilities still being wired onto the C# SDK (tasks, subscriptions, authorization). ──
@@ -299,15 +301,9 @@ static async Task<object?> Box<T>(Task<T> task) => await task;
 
 // Reads the first non-empty environment variable among the given names (C# override first, then the
 // shared TS-app name), or null when none is set — so one .env can drive both the C# and TS stacks.
-static string? Env(params string[] names)
-{
-  foreach (var name in names)
-  {
-    var value = Environment.GetEnvironmentVariable(name);
-    if (!string.IsNullOrEmpty(value)) return value;
-  }
-  return null;
-}
+static string? Env(params string[] names) =>
+  // Select is lazy, so GetEnvironmentVariable is only called up to the first non-empty match.
+  names.Select(Environment.GetEnvironmentVariable).FirstOrDefault(value => !string.IsNullOrEmpty(value));
 
 static JsonNode? ToNode<T>(T value) => JsonSerializer.SerializeToNode(value, McpJson.Options);
 

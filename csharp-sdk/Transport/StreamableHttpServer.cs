@@ -349,18 +349,15 @@ public static class StreamableHttpServer
     // Whoever signals first wins the race: the first emitted frame, or handler completion.
     var committedFirst = await Task.WhenAny(firstEmit.Task, dispatch).ConfigureAwait(false) == firstEmit.Task;
 
-    if (!committedFirst && dispatch.IsCompleted)
+    // The handler finished without ever emitting: single JSON response with the §9.7-mapped status.
+    // (If it both completed AND emitted in the same tick, firstEmit also fired; committedFirst above
+    // resolves the ambiguity toward whichever Task WhenAny observed — re-check the emit signal.)
+    if (!committedFirst && dispatch.IsCompleted && !firstEmit.Task.IsCompleted)
     {
-      // The handler finished without ever emitting: single JSON response with the §9.7-mapped status.
-      // (If it both completed AND emitted in the same tick, firstEmit also fired; committedFirst above
-      // resolves the ambiguity toward whichever Task WhenAny observed — re-check the emit signal.)
-      if (!firstEmit.Task.IsCompleted)
-      {
-        notifier.Seal();
-        var single = await dispatch.ConfigureAwait(false);
-        await WriteSingleResponseAsync(context, single).ConfigureAwait(false);
-        return;
-      }
+      notifier.Seal();
+      var single = await dispatch.ConfigureAwait(false);
+      await WriteSingleResponseAsync(context, single).ConfigureAwait(false);
+      return;
     }
 
     // Committed to streaming: open the SSE response, flush queued frames, then drain emits until the
@@ -572,6 +569,9 @@ public static class StreamableHttpServer
       channel.Writer.TryWrite(notification);
       return Task.CompletedTask;
     });
+    // Dispose the subscription's teardown when this scope ends — covering an exception from the
+    // acknowledgement write below as well as the normal close/cancel paths (§10.7).
+    using var subscriptionTeardown = teardown;
 
     PrepareEventStream(context);
 
@@ -596,10 +596,6 @@ public static class StreamableHttpServer
     catch (OperationCanceledException)
     {
       // The client closed the stream or cancelled the listen request (§10.7); fall through to teardown.
-    }
-    finally
-    {
-      teardown.Dispose();
     }
   }
 

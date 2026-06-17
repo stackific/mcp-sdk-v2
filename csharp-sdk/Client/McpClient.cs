@@ -117,14 +117,13 @@ public sealed class McpClient : IAsyncDisposable
       ?? throw McpError.InternalError("server/discover returned an unreadable result.");
 
     // §5.4 selection rule: choose the first of our preferred revisions the server also supports.
-    foreach (var preferred in ProtocolRevision.Supported)
+    var selected = ProtocolRevision.Supported
+      .FirstOrDefault(preferred => discovered.SupportedVersions.Contains(preferred, StringComparer.Ordinal));
+    if (selected is not null)
     {
-      if (discovered.SupportedVersions.Contains(preferred, StringComparer.Ordinal))
-      {
-        _protocolVersion = preferred;
-        _discovered = discovered;
-        return discovered;
-      }
+      _protocolVersion = selected;
+      _discovered = discovered;
+      return discovered;
     }
 
     throw McpError.InternalError(
@@ -205,9 +204,9 @@ public sealed class McpClient : IAsyncDisposable
     // Only a completed result carries structuredContent; validate it against the declared schema (§16.6).
     if (resultType != ResultTypes.Complete) return;
     if (!_knownToolOutputSchemas.TryGetValue(name, out var outputSchema) || outputSchema is null) return;
-    if (!result.ContainsKey("structuredContent")) return;
+    if (!result.TryGetPropertyValue("structuredContent", out var structuredContent)) return;
 
-    var validation = ToolSchemas.ValidateToolStructuredContent(outputSchema, result["structuredContent"]);
+    var validation = ToolSchemas.ValidateToolStructuredContent(outputSchema, structuredContent);
     if (!validation.Valid)
     {
       throw McpError.InternalError(
@@ -414,13 +413,11 @@ public sealed class McpClient : IAsyncDisposable
     // TS subscriptions/listen request-params validation (isAbsoluteUri over resourceSubscriptions).
     if (filter.ResourceSubscriptions is { Count: > 0 } uris)
     {
-      foreach (var uri in uris)
+      var nonAbsolute = uris.FirstOrDefault(uri => !Subscriptions.IsAbsoluteUri(uri));
+      if (nonAbsolute is not null)
       {
-        if (!Subscriptions.IsAbsoluteUri(uri))
-        {
-          throw McpError.InvalidParams(
-            $"A resource subscription URI MUST be an absolute URI [RFC3986] (R-10.2-i): \"{uri}\".");
-        }
+        throw McpError.InvalidParams(
+          $"A resource subscription URI MUST be an absolute URI [RFC3986] (R-10.2-i): \"{nonAbsolute}\".");
       }
     }
 

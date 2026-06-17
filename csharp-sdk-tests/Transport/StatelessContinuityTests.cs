@@ -34,7 +34,7 @@ public sealed class StatelessContinuityTests
   private static JsonRpcMessage RoundTripOnFreshConnection(McpServer server, JsonObject request)
   {
     var (serverChannel, clientChannel) = InMemoryByteChannelTransport.CreatePair();
-    var inbound = new BlockingCollection<JsonRpcMessage>();
+    using var inbound = new BlockingCollection<JsonRpcMessage>();
     using var subscription = clientChannel.OnMessage(inbound.Add);
     using var host = StdioServerHost.Serve(server, serverChannel);
 

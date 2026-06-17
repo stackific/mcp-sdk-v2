@@ -416,9 +416,9 @@ public static class Security
   {
     ArgumentNullException.ThrowIfNull(text);
     var builder = new StringBuilder(text.Length);
-    foreach (var c in text)
+    foreach (var c in text.Where(c => !IsStrippedControlChar(c)))
     {
-      if (!IsStrippedControlChar(c)) builder.Append(c);
+      builder.Append(c);
     }
     return builder.ToString();
   }
@@ -429,11 +429,7 @@ public static class Security
   public static bool ToolOutputHasControlSequences(string text)
   {
     ArgumentNullException.ThrowIfNull(text);
-    foreach (var c in text)
-    {
-      if (IsStrippedControlChar(c)) return true;
-    }
-    return false;
+    return text.Any(IsStrippedControlChar);
   }
 
   // ─── §28.4 — Data privacy and isolation (R-28.4-a – R-28.4-f; AC-44.11) ───────────
@@ -1373,11 +1369,7 @@ public static class Security
         }
         return false;
       case JsonArray array:
-        foreach (var value in array)
-        {
-          if (HasExternalRef(value, cap - 1)) return true;
-        }
-        return false;
+        return array.Any(value => HasExternalRef(value, cap - 1));
       default:
         return false;
     }

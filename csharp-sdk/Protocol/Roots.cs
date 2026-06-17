@@ -206,11 +206,7 @@ public static class RootsValidation
   public static bool IsValidStrictListRootsResult(ListRootsResult result)
   {
     ArgumentNullException.ThrowIfNull(result);
-    foreach (var root in result.Roots)
-    {
-      if (!IsValidRoot(root)) return false;
-    }
-    return true;
+    return result.Roots.All(IsValidRoot);
   }
 
   /// <summary>
@@ -315,13 +311,9 @@ public static class RootsValidation
     if (!IsValidFileUri(derivedUri)) return false;
     var derivedSegments = DecodedSegments(new Uri(derivedUri!).AbsolutePath);
 
-    foreach (var root in reportedRoots)
-    {
-      if (!IsValidFileUri(root.Uri)) continue;
-      var rootSegments = DecodedSegments(new Uri(root.Uri).AbsolutePath);
-      if (IsPrefixPath(rootSegments, derivedSegments)) return true;
-    }
-    return false;
+    return reportedRoots
+      .Where(root => IsValidFileUri(root.Uri))
+      .Any(root => IsPrefixPath(DecodedSegments(new Uri(root.Uri).AbsolutePath), derivedSegments));
   }
 
   /// <summary>Splits a URL path into non-empty, percent-decoded path segments.</summary>
@@ -330,15 +322,15 @@ public static class RootsValidation
   private static List<string> DecodedSegments(string path)
   {
     var segments = new List<string>();
-    foreach (var raw in path.Split('/'))
+    foreach (var raw in path.Split('/').Where(raw => raw.Length != 0))
     {
-      if (raw.Length == 0) continue;
       try
       {
         segments.Add(Uri.UnescapeDataString(raw));
       }
       catch (Exception)
       {
+        // A malformed escape sequence is kept verbatim rather than dropped.
         segments.Add(raw);
       }
     }

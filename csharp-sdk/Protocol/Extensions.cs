@@ -67,11 +67,7 @@ public static partial class Extensions
   {
     ArgumentNullException.ThrowIfNull(prefix);
     if (prefix.Length == 0) return false;
-    foreach (var label in prefix.Split('.'))
-    {
-      if (!PrefixLabelRegex().IsMatch(label)) return false;
-    }
-    return true;
+    return prefix.Split('.').All(label => PrefixLabelRegex().IsMatch(label));
   }
 
   /// <summary>
@@ -964,33 +960,25 @@ public static partial class Extensions
         "identifier", def.Classification, "Unknown extension classification (R-24.1-a)"));
     }
 
-    foreach (var method in def.Methods ?? [])
+    foreach (var method in (def.Methods ?? []).Where(method => !IsMethodInNamespace(method, def.Identifier)))
     {
-      if (!IsMethodInNamespace(method, def.Identifier))
-      {
-        violations.Add(new ExtensionDefinitionViolation(
-          "method", method, $"Method \"{method}\" is not namespaced under the extension (R-24.5-b)"));
-      }
+      violations.Add(new ExtensionDefinitionViolation(
+        "method", method, $"Method \"{method}\" is not namespaced under the extension (R-24.5-b)"));
     }
 
-    foreach (var key in def.MetaKeys ?? [])
+    foreach (var key in (def.MetaKeys ?? []).Where(key => !IsExtensionControlledMetaKey(key, def.Identifier)))
     {
-      if (!IsExtensionControlledMetaKey(key, def.Identifier))
-      {
-        violations.Add(new ExtensionDefinitionViolation(
-          "meta-key", key, $"_meta key \"{key}\" is not under a prefix the extension controls (R-24.5-d)"));
-      }
+      violations.Add(new ExtensionDefinitionViolation(
+        "meta-key", key, $"_meta key \"{key}\" is not under a prefix the extension controls (R-24.5-d)"));
     }
 
-    foreach (var rt in def.ResultTypeValues ?? [])
+    foreach (var rt in (def.ResultTypeValues ?? []).Where(rt =>
+      string.Equals(rt, ResultTypes.Complete, StringComparison.Ordinal) ||
+      string.Equals(rt, ResultTypes.InputRequired, StringComparison.Ordinal)))
     {
-      if (string.Equals(rt, ResultTypes.Complete, StringComparison.Ordinal) ||
-          string.Equals(rt, ResultTypes.InputRequired, StringComparison.Ordinal))
-      {
-        violations.Add(new ExtensionDefinitionViolation(
-          "result-type", rt,
-          $"resultType \"{rt}\" redefines a core value; extensions may only add new values (R-24.5-e, R-24.5-i)"));
-      }
+      violations.Add(new ExtensionDefinitionViolation(
+        "result-type", rt,
+        $"resultType \"{rt}\" redefines a core value; extensions may only add new values (R-24.5-e, R-24.5-i)"));
     }
 
     return new ExtensionDefinitionValidation(violations.Count == 0, violations);

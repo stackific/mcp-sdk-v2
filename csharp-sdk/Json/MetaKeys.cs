@@ -238,11 +238,7 @@ public static partial class MetaKeys
     if (value.Length == 0 || value.Length > 512) return false;
     var members = TracestateMemberSeparatorRegex().Split(value);
     if (members.Length > 32) return false;
-    foreach (var member in members)
-    {
-      if (!IsValidTracestateEntry(member)) return false;
-    }
-    return true;
+    return members.All(IsValidTracestateEntry);
   }
 
   /// <summary>
@@ -257,11 +253,7 @@ public static partial class MetaKeys
     ArgumentNullException.ThrowIfNull(value);
     if (value.Length == 0) return false;
     var members = TracestateMemberSeparatorRegex().Split(value);
-    foreach (var member in members)
-    {
-      if (!IsValidBaggageMember(member)) return false;
-    }
-    return true;
+    return members.All(IsValidBaggageMember);
   }
 
   /// <summary>

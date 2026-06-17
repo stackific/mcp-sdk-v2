@@ -181,11 +181,11 @@ public sealed class PromptsWireTests
 
   public static IEnumerable<object[]> ContentBlockCases() =>
   [
-    [(ContentBlock)ContentBlocks.Text("hi"), "text", typeof(TextContent)],
-    [(ContentBlock)ContentBlocks.Image("AAAA", "image/png"), "image", typeof(ImageContent)],
-    [(ContentBlock)ContentBlocks.Audio("BBBB", "audio/wav"), "audio", typeof(AudioContent)],
-    [(ContentBlock)ContentBlocks.LinkTo("u://x", "x", "application/json"), "resource_link", typeof(ResourceLink)],
-    [(ContentBlock)ContentBlocks.Resource(ResourceContents.OfText("u://r", "body")), "resource", typeof(EmbeddedResource)],
+    [ContentBlocks.Text("hi"), "text", typeof(TextContent)],
+    [ContentBlocks.Image("AAAA", "image/png"), "image", typeof(ImageContent)],
+    [ContentBlocks.Audio("BBBB", "audio/wav"), "audio", typeof(AudioContent)],
+    [ContentBlocks.LinkTo("u://x", "x", "application/json"), "resource_link", typeof(ResourceLink)],
+    [ContentBlocks.Resource(ResourceContents.OfText("u://r", "body")), "resource", typeof(EmbeddedResource)],
   ];
 
   [Theory]

@@ -205,14 +205,7 @@ public static class ClientIdAcquisition
   public static ClientIdMechanism Select(IEnumerable<ClientIdMechanism> supported)
   {
     var set = new HashSet<ClientIdMechanism>(supported);
-    foreach (var mechanism in Priority)
-    {
-      if (set.Contains(mechanism))
-      {
-        return mechanism;
-      }
-    }
-    return ClientIdMechanism.Prompt;
+    return Priority.FirstOrDefault(set.Contains, ClientIdMechanism.Prompt);
   }
 
   /// <summary>
@@ -1479,12 +1472,9 @@ public static class AccessTokenUsage
   /// <returns>The validation outcome.</returns>
   public static AuthorizationResult ValidateTokenAudience(IReadOnlyList<string> tokenAudiences, string ownCanonicalResource)
   {
-    foreach (var aud in tokenAudiences)
+    if (tokenAudiences.Any(aud => CanonicalResourceIdentifier.Equal(aud, ownCanonicalResource)))
     {
-      if (CanonicalResourceIdentifier.Equal(aud, ownCanonicalResource))
-      {
-        return AuthorizationResult.Success;
-      }
+      return AuthorizationResult.Success;
     }
     return AuthorizationResult.Fail(
       $"token audience [{string.Join(", ", tokenAudiences)}] was not issued for this server \"{ownCanonicalResource}\"; reject and never forward (R-23.6-g, R-23.6-h)");

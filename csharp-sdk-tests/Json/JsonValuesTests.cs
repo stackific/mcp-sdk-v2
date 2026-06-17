@@ -106,8 +106,8 @@ public sealed class JsonValuesTests
       new KeyValuePair<string, JsonNode?>("k", null),
     });
 
-    Assert.True(result.ContainsKey("k"));
-    Assert.Null(result["k"]);
+    Assert.True(result.TryGetPropertyValue("k", out var value));
+    Assert.Null(value);
   }
 
   // --- Safe-integer bounds (AC-02.14 — R-2.5-c, R-2.5-d, R-2.5-e). ---

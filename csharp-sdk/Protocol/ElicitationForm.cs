@@ -328,12 +328,10 @@ public static class ElicitationForm
     {
       errors.Add(new RestrictedFormSchemaError("properties", "requestedSchema.properties MUST be an object map (R-20.3-f)."));
     }
-    if (obj.TryGetPropertyValue("required", out var req) && req is not null)
+    if (obj.TryGetPropertyValue("required", out var req) && req is not null
+      && (AsArray(req) is not { } arr || arr.Any(e => AsString(e) is null)))
     {
-      if (AsArray(req) is not { } arr || arr.Any(e => AsString(e) is null))
-      {
-        errors.Add(new RestrictedFormSchemaError("required", "requestedSchema.required MUST be an array of strings (R-20.3-g)."));
-      }
+      errors.Add(new RestrictedFormSchemaError("required", "requestedSchema.required MUST be an array of strings (R-20.3-g)."));
     }
     if (obj.TryGetPropertyValue("$schema", out var dialect) && dialect is not null && AsString(dialect) is null)
     {
@@ -381,14 +379,11 @@ public static class ElicitationForm
     // Every `required` entry MUST name a declared property.
     if (AsArray(schema["required"]) is { } required)
     {
-      foreach (var entry in required)
-      {
-        if (AsString(entry) is { } req && !properties.ContainsKey(req))
-        {
-          errors.Add(new RestrictedFormSchemaError(
-            "required", $"required property \"{req}\" is not declared in properties (R-20.4-a)"));
-        }
-      }
+      errors.AddRange(required
+        .Select(AsString)
+        .Where(req => req is not null && !properties.ContainsKey(req))
+        .Select(req => new RestrictedFormSchemaError(
+          "required", $"required property \"{req}\" is not declared in properties (R-20.4-a)")));
     }
 
     return errors.Count == 0
@@ -568,10 +563,7 @@ public static class ElicitationForm
   {
     if (array is null) return null;
     var set = new HashSet<string>(StringComparer.Ordinal);
-    foreach (var element in array)
-    {
-      if (AsString(element) is { } s) set.Add(s);
-    }
+    set.UnionWith(array.Select(AsString).Where(s => s is not null).Select(s => s!));
     return set;
   }
 
@@ -645,10 +637,7 @@ public static class ElicitationForm
     var required = new HashSet<string>(StringComparer.Ordinal);
     if (AsArray(schema["required"]) is { } reqArr)
     {
-      foreach (var element in reqArr)
-      {
-        if (AsString(element) is { } s) required.Add(s);
-      }
+      required.UnionWith(reqArr.Select(AsString).Where(s => s is not null).Select(s => s!));
     }
 
     // No unknown fields.
@@ -661,13 +650,9 @@ public static class ElicitationForm
     }
 
     // Every required field present.
-    foreach (var req in required)
-    {
-      if (!map.ContainsKey(req))
-      {
-        errors.Add(new ElicitContentError(req, $"required field \"{req}\" is missing (R-20.5-c)"));
-      }
-    }
+    errors.AddRange(required
+      .Where(req => !map.ContainsKey(req))
+      .Select(req => new ElicitContentError(req, $"required field \"{req}\" is missing (R-20.5-c)")));
 
     // Per-field type and constraint conformance.
     foreach (var (name, propSchemaNode) in properties)
@@ -718,13 +703,9 @@ public static class ElicitationForm
             : AsString(value) is { } single ? [single] : [];
           if (allowed is not null)
           {
-            foreach (var v in values)
-            {
-              if (!allowed.Contains(v))
-              {
-                errors.Add(new ElicitContentError(name, $"value \"{v}\" is not one of the permitted enum values (R-20.5-c)"));
-              }
-            }
+            errors.AddRange(values
+              .Where(v => !allowed.Contains(v))
+              .Select(v => new ElicitContentError(name, $"value \"{v}\" is not one of the permitted enum values (R-20.5-c)")));
           }
           var form = ClassifyEnumSchema(propSchema);
           if (form is EnumSchemaForm.UntitledMultiSelect or EnumSchemaForm.TitledMultiSelect && AsArray(value) is { } selections)

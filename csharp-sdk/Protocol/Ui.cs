@@ -224,9 +224,9 @@ public static class Ui
     IReadOnlyList<string>? additionalMimeTypes = null)
   {
     var mimeTypes = new List<string> { UiResource.MimeType };
-    foreach (var mime in additionalMimeTypes ?? [])
+    foreach (var mime in (additionalMimeTypes ?? []).Where(mime => !string.Equals(mime, UiResource.MimeType, StringComparison.Ordinal)))
     {
-      if (!string.Equals(mime, UiResource.MimeType, StringComparison.Ordinal)) mimeTypes.Add(mime);
+      mimeTypes.Add(mime);
     }
     return new UiHostExtensionCapability { MimeTypes = mimeTypes };
   }

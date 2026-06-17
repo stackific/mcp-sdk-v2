@@ -453,7 +453,7 @@ public sealed class StdioTransportTests
   {
     var first = new FakeChild();
     var second = new FakeChild();
-    var replacements = new Queue<IChildProcess>(new[] { (IChildProcess)second });
+    var replacements = new Queue<IChildProcess>(new[] { second });
     ChildProcessLauncher launcher = () => replacements.Count > 0 ? replacements.Dequeue() : new FakeChild();
 
     var lost = new List<IReadOnlyList<RequestId>>();
@@ -633,7 +633,7 @@ public sealed class StdioTransportTests
   {
     var first = new FakeChild();
     var second = new FakeChild();
-    var replacements = new Queue<IChildProcess>(new[] { (IChildProcess)second });
+    var replacements = new Queue<IChildProcess>(new[] { second });
     ChildProcessLauncher launcher = () => replacements.Count > 0 ? replacements.Dequeue() : new FakeChild();
 
     var client = new StdioClientTransport(new StdioClientTransportOptions
