@@ -323,19 +323,30 @@ export function resourceIdentifiersEqual(a: string, b: string): boolean {
  * @param uri                - The candidate URI.
  * @param slashIsSignificant - When `true`, the trailing slash is preserved.
  */
+/**
+ * Removes a run of trailing `/` characters in linear time — used instead of a
+ * `/\/+$/` regex, which backtracks polynomially on inputs like `"////…x"`
+ * (CodeQL js/polynomial-redos).
+ */
+export function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x2f /* '/' */) end--;
+  return value.slice(0, end);
+}
+
 export function stripDefaultTrailingSlash(uri: string, slashIsSignificant = false): string {
   if (slashIsSignificant) return uri;
   try {
     const url = new URL(uri);
     // Only strip a path-level trailing slash; leave the bare-host root ("/") intact.
     if (url.pathname !== '/' && url.pathname.endsWith('/')) {
-      url.pathname = url.pathname.replace(/\/+$/, '');
+      url.pathname = stripTrailingSlashes(url.pathname);
       return url.href.replace(/#$/, '');
     }
     return uri;
   } catch {
     // Non-URL input: fall back to a conservative string strip that never empties.
-    return uri.length > 1 && uri.endsWith('/') ? uri.replace(/\/+$/, '') : uri;
+    return uri.length > 1 && uri.endsWith('/') ? stripTrailingSlashes(uri) : uri;
   }
 }
 
@@ -510,8 +521,11 @@ export function parseWwwAuthenticate(headerValue: string): WwwAuthenticateChalle
 
   const params: Record<string, string> = {};
   const paramsPart = schemeMatch[2] ?? '';
-  // Matches `key=value` where value is either a quoted string or a bare token.
-  const paramRe = /([A-Za-z0-9._-]+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^\s,]+))/g;
+  // Matches `key=value` where value is a quoted string or a bare token. Every repeat
+  // is length-bounded so a long unmatched run can't drive polynomial backtracking
+  // (CodeQL js/polynomial-redos); the bounds sit far above any real challenge param.
+  const paramRe =
+    /([A-Za-z0-9._-]{1,128})\s{0,64}=\s{0,64}(?:"((?:[^"\\]|\\.){0,4096})"|([^\s,]{1,4096}))/g;
   let m: RegExpExecArray | null;
   while ((m = paramRe.exec(paramsPart)) !== null) {
     const key = m[1]!.toLowerCase();

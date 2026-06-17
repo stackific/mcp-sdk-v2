@@ -173,10 +173,13 @@ export function createMcpRequestHandler(
         error: { code: e.code, message: e.message, ...(e.data !== undefined ? { data: e.data } : {}) },
       };
     }
+    // Never surface raw exception text to the client — it can leak internal detail
+    // (file paths, stack frames). Emit a generic message (CodeQL js/stack-trace-exposure);
+    // the original error stays available to server-side logging/observability.
     return {
       jsonrpc: '2.0',
       id,
-      error: { code: INTERNAL_ERROR_CODE, message: e instanceof Error ? e.message : String(e) },
+      error: { code: INTERNAL_ERROR_CODE, message: 'Internal error' },
     };
   };
 

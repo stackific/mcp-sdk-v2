@@ -484,7 +484,7 @@ class TestUserControl:
   def test_consent_presentation_surfaces_request(self):
     p = build_url_consent_presentation("https://mcp.example.com/ui/connect")
     assert p.host == "mcp.example.com"
-    assert "mcp.example.com" in p.full_url
+    assert p.full_url == "https://mcp.example.com/ui/connect"
 
 
 # ── AC-31.23 (R-20.7-h,i) — sensitive ⇒ url mode; contact data permitted ──────

@@ -1,8 +1,8 @@
 <div align="center">
 
-# MCP V2 SDK — with a full-featured demo (multi-language)
+# MCP V2 SDKs with a demo (multi-language)
 
-**The MCP V2 RC, implemented three times over: TypeScript · Python · C# — behind one live, switch-the-language demo.**
+**The MCP V2 RC, implemented in TypeScript · Python · C# — behind a demo.**
 
 <!-- Status -->
 
@@ -21,21 +21,6 @@
 </div>
 
 ---
-
-## 🎬 Demo
-
-<!-- Sample placeholder — replace docs/promo.mp4 with the real recording (named promo.mp4). -->
-
-<div align="center">
-
-<video src="https://github.com/stackific/mcp-sdk-v2/raw/main/docs/promo.mp4" controls muted width="80%">
-  Your browser can't play embedded video —
-  <a href="docs/promo.mp4">download the tutorial (<code>docs/promo.mp4</code>)</a> instead.
-</video>
-
-</div>
-
-> ▶️ Player not showing? Watch it directly: [`docs/promo.mp4`](docs/promo.mp4).
 
 Three SDKs behind a runnable companion to app showing 36 patterns from the **[MCP V2 RC specification](docs/model-context-protocol.md)**. The shared frontend can be backed by any of
 several **language stacks** — pick one on the home page and it repoints at that stack's MCP **client

@@ -1062,7 +1062,10 @@ function matchTemplate(template: string, uri: string): Record<string, string> | 
     '^' +
       pattern.replace(/\{([^}]+)\}/g, (_m, n) => {
         names.push(n);
-        return '([^/]+)';
+        // Length-bounded so adjacent `{a}{b}` vars can't form a polynomially
+        // backtracking `([^/]+)([^/]+)` matcher (CodeQL js/polynomial-redos);
+        // 1024 far exceeds any real URI path segment.
+        return '([^/]{1,1024})';
       }) +
       '$',
   );

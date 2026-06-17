@@ -1524,11 +1524,15 @@ export function buildBearerAuthorizationHeader(accessToken: string): string {
  */
 export function extractBearerToken(headerValue: string | undefined): string | undefined {
   if (headerValue === undefined) return undefined;
-  const match = /^(\S+)\s+(.+)$/.exec(headerValue.trim());
-  if (!match || match[1]!.toLowerCase() !== BEARER_AUTH_SCHEME.toLowerCase()) {
-    return undefined;
-  }
-  return match[2]!.trim();
+  // Split scheme + credentials at the first whitespace run via linear scanning,
+  // avoiding a `/^(\S+)\s+(.+)$/` regex whose overlapping `\s`/`.` repeats can
+  // backtrack polynomially on crafted input (CodeQL js/polynomial-redos).
+  const trimmed = headerValue.trim();
+  const ws = trimmed.search(/\s/);
+  if (ws < 0) return undefined;
+  if (trimmed.slice(0, ws).toLowerCase() !== BEARER_AUTH_SCHEME.toLowerCase()) return undefined;
+  const token = trimmed.slice(ws + 1).trim();
+  return token.length > 0 ? token : undefined;
 }
 
 /**
